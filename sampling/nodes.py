@@ -11,12 +11,12 @@ import random
 
 from ..utils.model_info import (
     FAMILY_DEFAULT_PRESET,
-    LLS_MODEL_INFO_TYPE,
     get_sampling_preset,
     info_to_json,
     is_flux_family,
     parse_model_info,
 )
+from ..utils.task_context import LLS_TASK_CONTEXT_TYPE, parse_task_context, update_task_context
 
 # ---------- 防御性导入 ----------
 
@@ -193,11 +193,11 @@ class LLSSimpleKSampler:
 
     CATEGORY = "LLS/Sampling"
     FUNCTION = "sample"
-    RETURN_TYPES = ("LATENT", "STRING")
-    RETURN_NAMES = ("latent", "sample_info")
+    RETURN_TYPES = ("LATENT", "STRING", LLS_TASK_CONTEXT_TYPE)
+    RETURN_NAMES = ("latent", "sample_info", "task_context")
     DESCRIPTION = (
         "Basic KSampler node. Reuses ComfyUI's native sampling pipeline. "
-        "quality_preset overrides steps and cfg when not 'Manual'. "
+        "quality_preset overrides steps/cfg/denoise when not 'Manual'. "
         "seed=-1 generates a random seed."
     )
 
@@ -219,7 +219,7 @@ class LLSSimpleKSampler:
                 "flux_guidance": ("FLOAT", {"default": 3.5, "min": 0.0, "max": 100.0, "step": 0.1}),
             },
             "optional": {
-                "model_info": (LLS_MODEL_INFO_TYPE,),
+                "task_context": (LLS_TASK_CONTEXT_TYPE,),
             },
         }
 
@@ -237,7 +237,7 @@ class LLSSimpleKSampler:
         scheduler: str,
         denoise: float,
         flux_guidance: float,
-        model_info=None,
+        task_context=None,
     ):
         if comfy_sample is None:
             raise RuntimeError(
@@ -250,25 +250,50 @@ class LLSSimpleKSampler:
                 "Make sure this node runs inside a ComfyUI environment."
             ) from _COMFY_SAMPLERS_ERR
 
-        info = parse_model_info(model_info)
-        family = info["family"]
+        context = parse_task_context(task_context)
+        info = parse_model_info(context)
+        family = context.get("resolved_model_family") or info["family"]
+        latent_source = latent_image.get("source") or context.get("latent_source")
+        effective_task_mode = context.get("task_mode") or "txt2img"
+        if latent_source == "empty_latent":
+            effective_task_mode = "txt2img"
+        elif latent_source == "image_encode":
+            effective_task_mode = "img2img"
 
-        preset = get_sampling_preset(info, quality_preset)
-        if preset is not None:
-            steps = int(preset["steps"])
-            cfg = float(preset["cfg"])
-            sampler_name = str(preset["sampler_name"])
-            scheduler = str(preset["scheduler"])
-            denoise = float(preset["denoise"])
-            if preset.get("guidance") is not None:
-                flux_guidance = float(preset["guidance"])
+        if quality_preset == FAMILY_DEFAULT_PRESET:
+            steps = int(context.get("recommended_steps", steps))
+            cfg = float(context.get("recommended_cfg", cfg))
+            sampler_name = str(context.get("recommended_sampler", sampler_name))
+            scheduler = str(context.get("recommended_scheduler", scheduler))
+            denoise = float(context.get("recommended_denoise", denoise))
+            context_guidance = context.get("recommended_guidance")
+            if context_guidance is not None:
+                flux_guidance = float(context_guidance)
+        else:
+            preset = get_sampling_preset(info, quality_preset)
+            if preset is not None:
+                steps = int(preset["steps"])
+                cfg = float(preset["cfg"])
+                sampler_name = str(preset["sampler_name"])
+                scheduler = str(preset["scheduler"])
+                denoise = float(preset["denoise"])
+                if preset.get("guidance") is not None:
+                    flux_guidance = float(preset["guidance"])
 
-        if is_flux_family(family) and node_helpers is not None:
+        if is_flux_family(family) and context.get("supports_flux_guidance", True):
+            guidance_value = flux_guidance
+        else:
+            guidance_value = None
+
+        if is_flux_family(family) and node_helpers is not None and guidance_value is not None:
             try:
-                positive = node_helpers.conditioning_set_values(positive, {"guidance": flux_guidance})
-                negative = node_helpers.conditioning_set_values(negative, {"guidance": flux_guidance})
+                positive = node_helpers.conditioning_set_values(positive, {"guidance": guidance_value})
+                negative = node_helpers.conditioning_set_values(negative, {"guidance": guidance_value})
             except Exception:
                 pass
+
+        if quality_preset not in {"Manual", FAMILY_DEFAULT_PRESET} and effective_task_mode == "img2img":
+            denoise = float(context.get("recommended_denoise", denoise))
 
         # seed = -1 时随机生成
         actual_seed = seed
@@ -294,7 +319,6 @@ class LLSSimpleKSampler:
                 f"[LLS] KSampler failed: {exc}"
             ) from exc
 
-        guidance_value = flux_guidance if is_flux_family(family) else None
         sample_info = info_to_json(
             {
                 "seed": actual_seed,
@@ -306,10 +330,25 @@ class LLSSimpleKSampler:
                 "denoise": denoise,
                 "quality_preset": quality_preset,
                 "family": family,
+                "task_mode": effective_task_mode,
             }
         )
+        next_context = update_task_context(
+            context,
+            resolved_model_family=family,
+            task_mode=effective_task_mode,
+            sampler_name=sampler_name,
+            scheduler=scheduler,
+            steps=steps,
+            cfg=cfg,
+            seed=actual_seed,
+            denoise=denoise,
+            guidance=guidance_value,
+            sampled=True,
+            source="LLS Simple KSampler",
+        )
 
-        return (result_latent, sample_info)
+        return (result_latent, sample_info, next_context)
 
 
 # ---------- 注册表 ----------

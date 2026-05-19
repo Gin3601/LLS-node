@@ -1,5 +1,4 @@
 import importlib.util
-import json
 import pathlib
 import sys
 import unittest
@@ -72,10 +71,10 @@ class TestUpscaleSwitcher(unittest.TestCase):
                 model_name=upscale_nodes.NO_UPSCALE_MODEL_PLACEHOLDER,
                 tile=512,
                 overlap=32,
-            )
+        )
 
         self.assertEqual(result[0], "PYTORCH_RESULT")
-        self.assertEqual(json.loads(result[1])["mode"], "interpolation")
+        self.assertEqual(result[1]["upscale_mode"], "interpolation")
         self.assertEqual(
             recorder.calls,
             [("pytorch", "image", 2.0, "bilinear")],

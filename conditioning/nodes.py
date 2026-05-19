@@ -8,13 +8,12 @@ CATEGORY = "LLS/Conditioning"
 from __future__ import annotations
 
 from ..utils.model_info import (
-    LLS_MODEL_INFO_TYPE,
     LLS_TEXT_ENCODER_TYPE,
-    info_to_json,
     is_flux_family,
     is_sdxl_family,
     parse_model_info,
 )
+from ..utils.task_context import LLS_TASK_CONTEXT_TYPE, parse_task_context, update_task_context
 
 
 _CLIP_SKIP_CHOICES = [None] + list(range(-1, -25, -1))
@@ -124,15 +123,15 @@ class LLSSimplePromptEncode:
 
     - `text_encoder` 为新接口。
     - `clip` 保留作旧工作流兼容入口。
-    - `model_info` 未连接时，会退回 SD1.5 默认逻辑。
+    - `task_context` 为统一控制对象；未连接时会退回 SD1.5 默认逻辑。
     """
 
     CATEGORY = "LLS/Conditioning"
     FUNCTION = "encode"
-    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING")
-    RETURN_NAMES = ("positive", "negative", "prompt_info")
+    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", LLS_TASK_CONTEXT_TYPE)
+    RETURN_NAMES = ("positive", "negative", "task_context")
     DESCRIPTION = (
-        "Encode prompts into CONDITIONING tensors. Uses model_info when available to "
+        "Encode prompts into CONDITIONING tensors. Uses task_context when available to "
         "dispatch between SD1.5, SDXL, SDXL Turbo, and FLUX text-encoding paths."
     )
 
@@ -147,7 +146,7 @@ class LLSSimplePromptEncode:
             "optional": {
                 "text_encoder": (LLS_TEXT_ENCODER_TYPE,),
                 "clip": ("CLIP",),
-                "model_info": (LLS_MODEL_INFO_TYPE,),
+                "task_context": (LLS_TASK_CONTEXT_TYPE,),
             },
         }
 
@@ -157,7 +156,7 @@ class LLSSimplePromptEncode:
         positive_prompt: str = "",
         negative_prompt: str = "",
         clip_skip=-1,
-        model_info=None,
+        task_context=None,
         clip=None,
     ):
         encoder = text_encoder if text_encoder is not None else clip
@@ -167,9 +166,12 @@ class LLSSimplePromptEncode:
                 "or the legacy 'clip' input."
             )
 
-        info = parse_model_info(model_info)
-        family = info["family"]
+        context = parse_task_context(task_context)
+        info = parse_model_info(context)
+        family = context.get("resolved_model_family") or info["family"]
         clip_skip = _normalize_clip_skip(clip_skip)
+        if not context.get("supports_clip_skip", True):
+            clip_skip = -1
 
         if clip_skip != -1:
             try:
@@ -202,17 +204,21 @@ class LLSSimplePromptEncode:
         except Exception as exc:
             raise RuntimeError(f"[LLS] Failed to encode prompts for family {family}: {exc}") from exc
 
-        prompt_info = info_to_json(
-            {
-                "positive_prompt": positive_prompt,
-                "negative_prompt": negative_prompt,
-                "family": family,
-                "text_encoder_type": info.get("text_encoder_type", "clip"),
-                "clip_skip": clip_skip,
-                "negative_mode": negative_mode,
-            }
+        prompt_mode = "flux" if is_flux_family(family) else "sdxl" if is_sdxl_family(family) else "clip"
+        next_context = update_task_context(
+            context,
+            resolved_model_family=family,
+            text_encoder_type=info.get("text_encoder_type", "clip"),
+            positive_prompt=positive_prompt,
+            negative_prompt=negative_prompt,
+            prompt_mode=prompt_mode,
+            positive_prompt_length=len(positive_prompt),
+            negative_prompt_length=len(negative_prompt),
+            clip_skip=clip_skip,
+            negative_mode=negative_mode,
+            source="LLS Simple Prompt Encode",
         )
-        return (positive, negative, prompt_info)
+        return (positive, negative, next_context)
 
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {

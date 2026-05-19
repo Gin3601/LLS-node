@@ -34,13 +34,13 @@ from __future__ import annotations
 
 from .model_info import (
     FAMILY_DEFAULT_PRESET,
-    LLS_MODEL_INFO_TYPE,
     SIZE_PRESET_AUTO,
     get_family_defaults,
     get_sampling_preset,
     info_to_json,
     parse_model_info,
 )
+from .task_context import LLS_TASK_CONTEXT_TYPE, parse_task_context
 
 
 # ---------- 节点类示例（基础类型，纯 Python 无外部依赖） ----------
@@ -172,12 +172,14 @@ class LLSGenerationConfig:
                 "size_preset": (cls._SIZE_PRESETS, {"default": SIZE_PRESET_AUTO}),
             },
             "optional": {
-                "model_info": (LLS_MODEL_INFO_TYPE,),
+                "task_context": (LLS_TASK_CONTEXT_TYPE,),
+                "model_info": (LLS_TASK_CONTEXT_TYPE,),
             },
         }
 
-    def execute(self, quality_preset: str, size_preset: str, model_info=None):
-        info = parse_model_info(model_info)
+    def execute(self, quality_preset: str, size_preset: str, task_context=None, model_info=None):
+        context = parse_task_context(task_context or model_info)
+        info = parse_model_info(context)
         defaults = get_family_defaults(info["family"])
         preset = get_sampling_preset(info, quality_preset) or {
             "steps": defaults["default_steps"],
@@ -201,7 +203,7 @@ class LLSGenerationConfig:
         guidance = 0.0 if guidance is None else float(guidance)
         config_info = info_to_json(
             {
-                "family": info["family"],
+                "family": context.get("resolved_model_family") or info["family"],
                 "width": width,
                 "height": height,
                 "steps": int(preset["steps"]),
