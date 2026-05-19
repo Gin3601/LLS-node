@@ -1,0 +1,8 @@
+"""
+node.model_loader
+=================
+功能域：模型加载与管理（对应功能分类总览第 1 节）
+"""
+from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
