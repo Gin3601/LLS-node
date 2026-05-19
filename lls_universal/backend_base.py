@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
+import inspect
 
 try:
     import torch
@@ -246,7 +247,45 @@ class UniversalBackendBase(ABC):
             images = images.reshape(-1, images.shape[-3], images.shape[-2], images.shape[-1])
         return images
 
+    def _encode_tokens(self, clip: Any, tokens: Any, add_dict: dict[str, Any] | None = None) -> Any:
+        add_dict = dict(add_dict or {})
+
+        scheduled = getattr(clip, "encode_from_tokens_scheduled", None)
+        if callable(scheduled):
+            return scheduled(tokens, add_dict=add_dict)
+
+        plain_encode = getattr(clip, "encode_from_tokens", None)
+        if not callable(plain_encode):
+            raise RuntimeError(
+                f"[LLS] {self.family_name} backend requires CLIP.encode_from_tokens_scheduled() "
+                "or CLIP.encode_from_tokens()."
+            )
+
+        try:
+            signature = inspect.signature(plain_encode)
+        except (TypeError, ValueError):
+            signature = None
+
+        supports_return_dict = signature is not None and "return_dict" in signature.parameters
+        if supports_return_dict:
+            pooled_dict = plain_encode(tokens, return_pooled=True, return_dict=True)
+        else:
+            encoded = plain_encode(tokens, return_pooled=True)
+            if isinstance(encoded, tuple):
+                cond, pooled = encoded[:2]
+                pooled_dict = {"cond": cond, "pooled_output": pooled}
+            else:
+                pooled_dict = {"cond": encoded}
+
+        if not isinstance(pooled_dict, dict) or "cond" not in pooled_dict:
+            raise RuntimeError(
+                f"[LLS] {self.family_name} backend received unsupported CLIP encode output."
+            )
+
+        cond = pooled_dict.pop("cond")
+        pooled_dict.update(add_dict)
+        return [[cond, pooled_dict]]
+
     def _encode_standard_prompt(self, clip: Any, prompt: str, add_dict: dict[str, Any] | None = None) -> Any:
         tokens = clip.tokenize(prompt)
-        return clip.encode_from_tokens_scheduled(tokens, add_dict=add_dict or {})
-
+        return self._encode_tokens(clip, tokens, add_dict=add_dict)

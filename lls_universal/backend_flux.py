@@ -28,4 +28,4 @@ class FluxBackend(UniversalBackendBase):
 
     def _encode_flux_prompt(self, clip, prompt: str, guidance: float):
         tokens = clip.tokenize(prompt)
-        return clip.encode_from_tokens_scheduled(tokens, add_dict={"guidance": guidance})
+        return self._encode_tokens(clip, tokens, add_dict={"guidance": guidance})

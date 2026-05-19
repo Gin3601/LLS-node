@@ -11,13 +11,52 @@ from __future__ import annotations
 # （本节点直接调用 clip 对象方法，无需额外导入 comfy.sd）
 
 
+def _encode_conditioning(clip, prompt: str):
+    """
+    兼容新旧 ComfyUI 的文本编码入口。
+
+    新版本优先使用 `encode_from_tokens_scheduled()`；
+    若运行环境较旧，仅存在 `encode_from_tokens()`，则手动包装成
+    ComfyUI 约定的 CONDITIONING 结构。
+    """
+    tokens = clip.tokenize(prompt)
+
+    scheduled = getattr(clip, "encode_from_tokens_scheduled", None)
+    if callable(scheduled):
+        return scheduled(tokens)
+
+    plain_encode = getattr(clip, "encode_from_tokens", None)
+    if not callable(plain_encode):
+        raise AttributeError(
+            "CLIP object does not expose encode_from_tokens_scheduled() "
+            "or encode_from_tokens()."
+        )
+
+    try:
+        pooled_dict = plain_encode(tokens, return_pooled=True, return_dict=True)
+    except TypeError:
+        encoded = plain_encode(tokens, return_pooled=True)
+        if isinstance(encoded, tuple):
+            cond, pooled = encoded[:2]
+            pooled_dict = {"cond": cond, "pooled_output": pooled}
+        else:
+            pooled_dict = {"cond": encoded}
+
+    if not isinstance(pooled_dict, dict) or "cond" not in pooled_dict:
+        raise RuntimeError("[LLS] Legacy CLIP encode_from_tokens() returned an unsupported value.")
+
+    cond = pooled_dict.pop("cond")
+    return [[cond, pooled_dict]]
+
+
 # ---------- 节点类 ----------
 
 class LLSSimplePromptEncode:
     """
     简化版提示词编码节点。
-    内部复用 ComfyUI 原生 clip.encode_from_tokens_scheduled()，
-    自动适配 SD1.5 / SDXL（CLIP 对象内部根据模型类型处理 DualCLIP 路由）。
+    优先复用 ComfyUI 原生 clip.encode_from_tokens_scheduled()，
+    旧版环境下自动回退到 encode_from_tokens()，
+    以兼容 SD1.5 / SDXL 的常见 CLIP 编码路径。
     """
 
     CATEGORY = "LLS/Conditioning"
@@ -26,7 +65,8 @@ class LLSSimplePromptEncode:
     RETURN_NAMES = ("positive", "negative", "prompt_info")
     DESCRIPTION = (
         "Encode positive and negative prompts into CONDITIONING tensors. "
-        "Reuses ComfyUI native encode_from_tokens_scheduled for SD1.5/SDXL compatibility."
+        "Prefers ComfyUI native encode_from_tokens_scheduled and falls back to "
+        "encode_from_tokens for older runtimes."
     )
 
     @classmethod
@@ -57,8 +97,7 @@ class LLSSimplePromptEncode:
 
         # 编码 positive — 复用 ComfyUI 原生编码入口
         try:
-            tokens_pos = clip.tokenize(positive_prompt)
-            positive = clip.encode_from_tokens_scheduled(tokens_pos)
+            positive = _encode_conditioning(clip, positive_prompt)
         except Exception as exc:
             raise RuntimeError(
                 f"[LLS] Failed to encode positive prompt: {exc}"
@@ -66,8 +105,7 @@ class LLSSimplePromptEncode:
 
         # 编码 negative — 复用 ComfyUI 原生编码入口
         try:
-            tokens_neg = clip.tokenize(negative_prompt)
-            negative = clip.encode_from_tokens_scheduled(tokens_neg)
+            negative = _encode_conditioning(clip, negative_prompt)
         except Exception as exc:
             raise RuntimeError(
                 f"[LLS] Failed to encode negative prompt: {exc}"

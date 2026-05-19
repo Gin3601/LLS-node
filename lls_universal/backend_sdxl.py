@@ -42,7 +42,7 @@ class SDXLBackend(UniversalBackendBase):
                 "target_width": width,
                 "target_height": height,
             }
-            return clip.encode_from_tokens_scheduled(tokens, add_dict=add_dict)
+            return self._encode_tokens(clip, tokens, add_dict=add_dict)
         return self._encode_standard_prompt(
             clip,
             prompt,
