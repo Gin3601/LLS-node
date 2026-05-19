@@ -10,6 +10,8 @@ from __future__ import annotations
 # ---------- 防御性导入 ----------
 # （本节点直接调用 clip 对象方法，无需额外导入 comfy.sd）
 
+_CLIP_SKIP_CHOICES = [None] + list(range(-1, -25, -1))
+
 
 def _encode_conditioning(clip, prompt: str):
     """
@@ -49,6 +51,22 @@ def _encode_conditioning(clip, prompt: str):
     return [[cond, pooled_dict]]
 
 
+def _normalize_clip_skip(value) -> int:
+    """
+    兼容旧工作流中的 null / None，以及字符串形式的 clip_skip。
+    """
+    if value in (None, "", "None"):
+        return -1
+    try:
+        normalized = int(value)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"[LLS] Invalid clip_skip value: {value!r}") from exc
+
+    if normalized < -24 or normalized > -1:
+        raise RuntimeError(f"[LLS] clip_skip out of supported range [-24, -1]: {normalized}")
+    return normalized
+
+
 # ---------- 节点类 ----------
 
 class LLSSimplePromptEncode:
@@ -76,15 +94,17 @@ class LLSSimplePromptEncode:
                 "clip": ("CLIP",),
                 "positive_prompt": ("STRING", {"default": "", "multiline": True}),
                 "negative_prompt": ("STRING", {"default": "", "multiline": True}),
-                "clip_skip": ("INT", {"default": -1, "min": -24, "max": -1, "step": 1}),
+                "clip_skip": (_CLIP_SKIP_CHOICES, {"default": -1}),
             }
         }
 
-    def encode(self, clip, positive_prompt: str, negative_prompt: str, clip_skip: int):
+    def encode(self, clip, positive_prompt: str, negative_prompt: str, clip_skip):
         if clip is None:
             raise RuntimeError(
                 "[LLS] CLIP is None. Make sure a checkpoint is loaded before connecting to this node."
             )
+
+        clip_skip = _normalize_clip_skip(clip_skip)
 
         # 应用 clip_skip（ComfyUI CLIP 对象支持 clip_layer）
         if clip_skip != -1:

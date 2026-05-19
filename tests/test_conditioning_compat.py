@@ -53,6 +53,15 @@ class UniversalClipStub:
 
 
 class TestConditioningCompatibility(unittest.TestCase):
+    def test_simple_prompt_encode_schema_accepts_legacy_none_clip_skip(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimplePromptEncode"]
+        clip_skip_type, clip_skip_config = node_cls.INPUT_TYPES()["required"]["clip_skip"]
+
+        self.assertIsInstance(clip_skip_type, list)
+        self.assertIn(None, clip_skip_type)
+        self.assertEqual(clip_skip_config["default"], -1)
+
     def test_simple_prompt_encode_falls_back_for_legacy_clip(self):
         plugin = load_plugin_package()
         node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimplePromptEncode"]
@@ -74,6 +83,28 @@ class TestConditioningCompatibility(unittest.TestCase):
             [["cond::low quality", {"pooled_output": "pooled::low quality"}]],
         )
         self.assertIn("clip_skip=-2", prompt_info)
+
+    def test_simple_prompt_encode_normalizes_none_clip_skip(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimplePromptEncode"]
+        node = node_cls()
+
+        positive, negative, prompt_info = node.encode(
+            LegacyClipStub(),
+            "a cat",
+            "low quality",
+            None,
+        )
+
+        self.assertEqual(
+            positive,
+            [["cond::a cat", {"pooled_output": "pooled::a cat"}]],
+        )
+        self.assertEqual(
+            negative,
+            [["cond::low quality", {"pooled_output": "pooled::low quality"}]],
+        )
+        self.assertIn("clip_skip=-1", prompt_info)
 
     def test_universal_backend_falls_back_for_legacy_clip(self):
         load_plugin_package()
