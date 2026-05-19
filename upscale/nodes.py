@@ -73,6 +73,14 @@ def _get_upscale_model_names() -> list[str]:
     return names if names else [NO_UPSCALE_MODEL_PLACEHOLDER]
 
 
+def _has_real_upscale_models(model_names: list[str]) -> bool:
+    return any(name and name != NO_UPSCALE_MODEL_PLACEHOLDER for name in model_names)
+
+
+def _is_missing_upscale_model_selection(model_name: str | None) -> bool:
+    return model_name in (None, "", NO_UPSCALE_MODEL_PLACEHOLDER)
+
+
 def _resolve_upscale_model_path(model_name: str) -> str:
     _require_comfy_modules()
     if model_name == NO_UPSCALE_MODEL_PLACEHOLDER:
@@ -212,10 +220,11 @@ class LLSUpscaleSwitcher:
     @classmethod
     def INPUT_TYPES(cls):
         model_names = _sorted_unique(_get_upscale_model_names())
+        default_mode = "upscale_model" if _has_real_upscale_models(model_names) else "pytorch"
         return {
             "required": {
                 "image": ("IMAGE",),
-                "mode": (UPSCALE_MODE_CHOICES, {"default": "upscale_model"}),
+                "mode": (UPSCALE_MODE_CHOICES, {"default": default_mode}),
                 "scale": ("FLOAT", {"default": 2.0, "min": 0.1, "max": 8.0, "step": 0.1}),
                 "interpolation": (INTERPOLATION_CHOICES, {"default": "bilinear"}),
                 "model_name": (model_names,),
@@ -228,6 +237,12 @@ class LLSUpscaleSwitcher:
         if mode not in UPSCALE_MODE_CHOICES:
             raise RuntimeError(f"Unsupported mode '{mode}'. Expected one of {UPSCALE_MODE_CHOICES}.")
         if mode == "pytorch":
+            return self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)
+        if _is_missing_upscale_model_selection(model_name):
+            print(
+                "[LLS] WARNING: No valid upscale model is selected. "
+                "Falling back to PyTorch interpolation mode."
+            )
             return self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)
         return self._upscale_with_model(image=image, model_name=model_name, tile=tile, overlap=overlap)
 
