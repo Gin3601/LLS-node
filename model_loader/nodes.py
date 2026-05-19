@@ -7,7 +7,7 @@ CATEGORY = "LLS/Model Loader"
 """
 from __future__ import annotations
 
-# ---------- 防御性导入 ----------
+import importlib
 
 try:
     import folder_paths
@@ -25,118 +25,390 @@ except Exception as exc:
 else:
     _COMFY_SD_ERR = None
 
-# 注：comfy.utils 在本模块未使用，无需导入
+try:
+    comfy_core_nodes = importlib.import_module("nodes")
+except Exception as exc:
+    comfy_core_nodes = None
+    _CORE_NODES_ERR = exc
+else:
+    _CORE_NODES_ERR = None
+
+from ..utils.model_info import (
+    MODEL_FAMILY_CHOICES,
+    build_model_info,
+    canonicalize_family,
+    family_requires_guidance,
+    get_latent_spec,
+    infer_family_from_name,
+    is_flux_family,
+    is_sdxl_family,
+)
 
 
-# ---------- 工具函数 ----------
+AUTO_PLACEHOLDER = "(auto)"
+NO_MODELS_PLACEHOLDER = "(no models found)"
+NO_VAE_PLACEHOLDER = "(no vae found)"
+NO_TEXT_ENCODER_PLACEHOLDER = "(no text encoders found)"
+LOAD_MODE_CHOICES = ["simple", "advanced"]
+VAE_SOURCE_CHOICES = ["auto", "embedded", "external", "none"]
+TEXT_ENCODER_SOURCE_CHOICES = ["auto", "embedded", "external", "manual"]
 
-def _get_checkpoint_names() -> list[str]:
+
+def _get_filename_list(category: str) -> list[str]:
     if folder_paths is None:
-        return ["(ComfyUI not available)"]
+        return []
     try:
-        names = folder_paths.get_filename_list("checkpoints")
-        return names if names else ["(no checkpoints found)"]
+        return list(folder_paths.get_filename_list(category))
     except Exception:
-        return ["(no checkpoints found)"]
+        return []
 
 
-def _detect_family(ckpt_name: str, model_family: str) -> str:
-    """根据 model_family 参数或文件名推断模型家族。"""
-    if model_family in ("SD1.5", "SDXL"):
-        return model_family
-    # Auto：通过文件名关键词简单判断
-    name_lower = ckpt_name.lower()
-    if any(kw in name_lower for kw in ("sdxl", "_xl", "-xl", "xl_")):
-        return "SDXL"
-    return "SD1.5"
+def _with_placeholder(names: list[str], placeholder: str) -> list[str]:
+    cleaned = [name for name in names if name]
+    if not cleaned:
+        return [AUTO_PLACEHOLDER, placeholder]
+    return [AUTO_PLACEHOLDER] + cleaned
 
 
-# ---------- 节点类 ----------
+def _get_model_name_choices() -> list[str]:
+    checkpoints = _get_filename_list("checkpoints")
+    diffusion_models = [f"diffusion_models/{name}" for name in _get_filename_list("diffusion_models")]
+    names = list(dict.fromkeys(checkpoints + diffusion_models))
+    return names if names else [NO_MODELS_PLACEHOLDER]
+
+
+def _get_vae_choices() -> list[str]:
+    if comfy_core_nodes is not None:
+        vae_loader = getattr(comfy_core_nodes, "VAELoader", None)
+        if vae_loader is not None and hasattr(vae_loader, "vae_list"):
+            try:
+                names = list(vae_loader.vae_list(vae_loader))
+                return _with_placeholder(names, NO_VAE_PLACEHOLDER)
+            except Exception:
+                pass
+    return _with_placeholder(_get_filename_list("vae"), NO_VAE_PLACEHOLDER)
+
+
+def _get_text_encoder_choices() -> list[str]:
+    return _with_placeholder(_get_filename_list("text_encoders"), NO_TEXT_ENCODER_PLACEHOLDER)
+
+
+def _normalize_choice(value: str | None, placeholder: str) -> str | None:
+    if value in (None, "", AUTO_PLACEHOLDER, placeholder):
+        return None
+    return value
+
+
+def _get_full_path(category: str, name: str) -> str | None:
+    if folder_paths is None:
+        return None
+    try:
+        return folder_paths.get_full_path_or_raise(category, name)
+    except AttributeError:
+        return folder_paths.get_full_path(category, name)
+    except FileNotFoundError:
+        return None
+
+
+def _resolve_model_path(model_name: str, family: str) -> tuple[str, str]:
+    if model_name == NO_MODELS_PLACEHOLDER:
+        raise RuntimeError(
+            "[LLS] No models were found in ComfyUI models/checkpoints or models/diffusion_models."
+        )
+
+    if model_name.startswith("diffusion_models/"):
+        if not is_flux_family(family):
+            raise RuntimeError(
+                f"[LLS] {family} expects a checkpoint file. Select a checkpoint from models/checkpoints/."
+            )
+        short_name = model_name.split("/", 1)[1]
+        model_path = _get_full_path("diffusion_models", short_name)
+        if model_path:
+            return ("diffusion_models", model_path)
+
+    checkpoint_path = _get_full_path("checkpoints", model_name)
+    if checkpoint_path:
+        return ("checkpoints", checkpoint_path)
+
+    if is_flux_family(family):
+        diffusion_path = _get_full_path("diffusion_models", model_name)
+        if diffusion_path:
+            return ("diffusion_models", diffusion_path)
+
+    raise RuntimeError(
+        f"[LLS] Model '{model_name}' was not found in the expected ComfyUI model directories."
+    )
+
+
+def _load_checkpoint_bundle(model_path: str):
+    try:
+        return comfy_sd.load_checkpoint_guess_config(
+            model_path,
+            output_vae=True,
+            output_clip=True,
+            embedding_directory=folder_paths.get_folder_paths("embeddings"),
+        )
+    except Exception as exc:
+        raise RuntimeError(f"[LLS] Failed to load checkpoint '{model_path}': {exc}") from exc
+
+
+def _load_model(model_source: str, model_path: str):
+    if model_source == "checkpoints":
+        loaded = _load_checkpoint_bundle(model_path)
+        return loaded[0], loaded[1], loaded[2]
+
+    try:
+        model = comfy_sd.load_diffusion_model(model_path)
+    except Exception as exc:
+        raise RuntimeError(f"[LLS] Failed to load diffusion model '{model_path}': {exc}") from exc
+    return model, None, None
+
+
+def _load_external_vae(vae_name: str):
+    if comfy_core_nodes is None:
+        raise RuntimeError(
+            "[LLS] ComfyUI core VAELoader is unavailable, so external VAE loading cannot be used."
+        ) from _CORE_NODES_ERR
+
+    vae_loader_cls = getattr(comfy_core_nodes, "VAELoader", None)
+    if vae_loader_cls is None:
+        raise RuntimeError("[LLS] ComfyUI core VAELoader class was not found.")
+    return vae_loader_cls().load_vae(vae_name)[0]
+
+
+def _load_external_text_encoder(family: str, name1: str | None, name2: str | None):
+    if comfy_core_nodes is None:
+        raise RuntimeError(
+            "[LLS] ComfyUI core CLIP loaders are unavailable, so external text encoder loading cannot be used."
+        ) from _CORE_NODES_ERR
+
+    if family == "SD15":
+        if not name1:
+            raise RuntimeError(
+                "[LLS] SD15 external text encoder loading requires external_text_encoder_1."
+            )
+        clip_loader_cls = getattr(comfy_core_nodes, "CLIPLoader", None)
+        if clip_loader_cls is None:
+            raise RuntimeError("[LLS] ComfyUI core CLIPLoader class was not found.")
+        return clip_loader_cls().load_clip(name1, type="stable_diffusion")[0]
+
+    if is_sdxl_family(family):
+        if not name1 or not name2:
+            raise RuntimeError(
+                "[LLS] SDXL external text encoder loading requires clip_l and clip_g via "
+                "external_text_encoder_1/external_text_encoder_2."
+            )
+        dual_loader_cls = getattr(comfy_core_nodes, "DualCLIPLoader", None)
+        if dual_loader_cls is None:
+            raise RuntimeError("[LLS] ComfyUI core DualCLIPLoader class was not found.")
+        return dual_loader_cls().load_clip(name1, name2, type="sdxl")[0]
+
+    if not name1 or not name2:
+        raise RuntimeError(
+            "[LLS] FLUX text encoder loading requires clip_l and t5xxl via "
+            "external_text_encoder_1/external_text_encoder_2."
+        )
+    dual_loader_cls = getattr(comfy_core_nodes, "DualCLIPLoader", None)
+    if dual_loader_cls is None:
+        raise RuntimeError("[LLS] ComfyUI core DualCLIPLoader class was not found.")
+    return dual_loader_cls().load_clip(name1, name2, type="flux")[0]
+
+
+def _resolve_text_encoder(
+    family: str,
+    source: str,
+    embedded_text_encoder,
+    external_name_1: str | None,
+    external_name_2: str | None,
+) -> tuple[object | None, str]:
+    if source == "manual":
+        return None, "manual"
+
+    if source == "embedded":
+        if embedded_text_encoder is None:
+            raise RuntimeError(
+                f"[LLS] {family} was set to use embedded text encoders, but the selected model did not provide them."
+            )
+        return embedded_text_encoder, "embedded"
+
+    if source == "external":
+        return _load_external_text_encoder(family, external_name_1, external_name_2), "external"
+
+    if embedded_text_encoder is not None:
+        return embedded_text_encoder, "embedded"
+    if external_name_1:
+        return _load_external_text_encoder(family, external_name_1, external_name_2), "external"
+
+    if is_flux_family(family):
+        raise RuntimeError(
+            "[LLS] FLUX models need text encoders. Provide clip_l and t5xxl via "
+            "external_text_encoder_1/external_text_encoder_2, or use a checkpoint that embeds them."
+        )
+
+    raise RuntimeError(
+        f"[LLS] {family} did not expose an embedded text encoder. "
+        "Switch text_encoder_source to 'external' and choose the required encoder files."
+    )
+
+
+def _resolve_vae(
+    family: str,
+    source: str,
+    embedded_vae,
+    external_vae_name: str | None,
+) -> tuple[object | None, str]:
+    if source == "none":
+        if is_flux_family(family):
+            raise RuntimeError(
+                "[LLS] FLUX generation requires a VAE/AE. Provide external_vae_name or use a model with an embedded VAE."
+            )
+        return None, "none"
+
+    if source == "embedded":
+        if embedded_vae is None:
+            raise RuntimeError(
+                f"[LLS] {family} was set to use an embedded VAE, but the selected model did not provide one."
+            )
+        return embedded_vae, "embedded"
+
+    if source == "external":
+        if not external_vae_name:
+            raise RuntimeError("[LLS] External VAE loading requires external_vae_name.")
+        return _load_external_vae(external_vae_name), "external"
+
+    if embedded_vae is not None:
+        return embedded_vae, "embedded"
+    if external_vae_name:
+        return _load_external_vae(external_vae_name), "external"
+    if is_flux_family(family):
+        raise RuntimeError(
+            "[LLS] FLUX models usually need an external AE/VAE. Provide external_vae_name or use a model with an embedded VAE."
+        )
+    return None, "none"
+
+
+def _text_encoder_type_for_family(family: str) -> str:
+    if family == "SD15":
+        return "clip"
+    if is_sdxl_family(family):
+        return "sdxl_dual_clip"
+    return "flux_clip_l_t5xxl"
+
+
+def _required_text_encoders_for_family(family: str) -> list[str]:
+    if family == "SD15":
+        return ["clip"]
+    if is_sdxl_family(family):
+        return ["clip_l", "clip_g"]
+    return ["clip_l", "t5xxl"]
+
+
+def _required_vae_for_family(family: str) -> str:
+    return "required" if is_flux_family(family) else "optional"
+
 
 class LLSSimpleCheckpointLoader:
     """
-    简化版 Checkpoint 加载器，支持 SD1.5 / SDXL 基础流程。
-    自动识别模型家族，输出 MODEL / CLIP / VAE 以及模型信息字符串。
-    内部复用 ComfyUI 原生 load_checkpoint_guess_config，已自动适配两种架构。
+    统一外观的模型加载节点。
+
+    对外仍然输出 MODEL / CLIP / VAE / STRING 以兼容旧工作流；
+    但第二个端口实际语义已经升级为 text_encoder，资源分派策略则由
+    model_family + source 选项控制。
     """
 
     CATEGORY = "LLS/Model Loader"
     FUNCTION = "load_checkpoint"
     RETURN_TYPES = ("MODEL", "CLIP", "VAE", "STRING")
-    RETURN_NAMES = ("model", "clip", "vae", "model_info")
-    DESCRIPTION = "Load a SD1.5 or SDXL checkpoint. Outputs MODEL, CLIP, VAE and a model_info string."
-
-    _FAMILY_CHOICES = ["Auto", "SD1.5", "SDXL"]
+    RETURN_NAMES = ("model", "text_encoder", "vae", "model_info")
+    DESCRIPTION = (
+        "Load SD15, SDXL, SDXL Turbo, and FLUX families with family-specific resource "
+        "dispatch. The CLIP-typed output now represents the resolved text encoder bundle."
+    )
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "ckpt_name": (_get_checkpoint_names(),),
-                "model_family": (cls._FAMILY_CHOICES, {"default": "Auto"}),
+                "ckpt_name": (_get_model_name_choices(),),
+                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
+                "load_mode": (LOAD_MODE_CHOICES, {"default": "simple"}),
+                "vae_source": (VAE_SOURCE_CHOICES, {"default": "auto"}),
+                "text_encoder_source": (TEXT_ENCODER_SOURCE_CHOICES, {"default": "auto"}),
+                "external_vae_name": (_get_vae_choices(), {"default": AUTO_PLACEHOLDER}),
+                "external_text_encoder_1": (_get_text_encoder_choices(), {"default": AUTO_PLACEHOLDER}),
+                "external_text_encoder_2": (_get_text_encoder_choices(), {"default": AUTO_PLACEHOLDER}),
             }
         }
 
-    def load_checkpoint(self, ckpt_name: str, model_family: str):
+    def load_checkpoint(
+        self,
+        ckpt_name: str,
+        model_family: str,
+        load_mode: str,
+        vae_source: str,
+        text_encoder_source: str,
+        external_vae_name: str,
+        external_text_encoder_1: str,
+        external_text_encoder_2: str,
+    ):
         if folder_paths is None:
             raise RuntimeError(
-                "[LLS] folder_paths is not available. "
-                "Make sure this node runs inside a ComfyUI environment."
+                "[LLS] folder_paths is not available. Make sure this node runs inside ComfyUI."
             ) from _FOLDER_PATHS_ERR
         if comfy_sd is None:
             raise RuntimeError(
-                "[LLS] comfy.sd is not available. "
-                "Make sure this node runs inside a ComfyUI environment."
+                "[LLS] comfy.sd is not available. Make sure this node runs inside ComfyUI."
             ) from _COMFY_SD_ERR
 
-        # 解析模型路径（使用 ComfyUI 原生方法，自动抛出文件不存在异常）
-        try:
-            ckpt_path = folder_paths.get_full_path_or_raise("checkpoints", ckpt_name)
-        except (AttributeError, TypeError):
-            # get_full_path_or_raise 在旧版 ComfyUI 中可能不存在，回退到 get_full_path
-            ckpt_path = folder_paths.get_full_path("checkpoints", ckpt_name)
-            if not ckpt_path:
-                raise RuntimeError(
-                    f"[LLS] Checkpoint '{ckpt_name}' not found in ComfyUI checkpoints directories. "
-                    f"Please add the file to models/checkpoints/ and restart ComfyUI."
-                )
-        except FileNotFoundError as exc:
-            raise RuntimeError(
-                f"[LLS] Checkpoint '{ckpt_name}' not found: {exc}"
-            ) from exc
+        family = canonicalize_family(model_family)
+        if model_family == "Auto":
+            family = infer_family_from_name(ckpt_name, family)
 
-        # 加载 checkpoint（复用 ComfyUI 原生加载逻辑，自动适配 SD1.5 / SDXL）
-        try:
-            out = comfy_sd.load_checkpoint_guess_config(
-                ckpt_path,
-                output_vae=True,
-                output_clip=True,
-                embedding_directory=folder_paths.get_folder_paths("embeddings"),
-            )
-        except Exception as exc:
-            raise RuntimeError(
-                f"[LLS] Failed to load checkpoint '{ckpt_name}': {exc}"
-            ) from exc
-
-        model, clip, vae = out[0], out[1], out[2]
+        model_source, model_path = _resolve_model_path(ckpt_name, family)
+        model, embedded_text_encoder, embedded_vae = _load_model(model_source, model_path)
 
         if model is None:
-            raise RuntimeError(f"[LLS] Checkpoint '{ckpt_name}' did not produce a valid MODEL.")
-        if clip is None:
-            raise RuntimeError(f"[LLS] Checkpoint '{ckpt_name}' did not produce a valid CLIP.")
-        if vae is None:
-            raise RuntimeError(f"[LLS] Checkpoint '{ckpt_name}' did not produce a valid VAE.")
+            raise RuntimeError(f"[LLS] The selected model '{ckpt_name}' did not produce a valid MODEL.")
 
-        detected_family = _detect_family(ckpt_name, model_family)
+        external_vae_name = _normalize_choice(external_vae_name, NO_VAE_PLACEHOLDER)
+        external_text_encoder_1 = _normalize_choice(external_text_encoder_1, NO_TEXT_ENCODER_PLACEHOLDER)
+        external_text_encoder_2 = _normalize_choice(external_text_encoder_2, NO_TEXT_ENCODER_PLACEHOLDER)
 
-        model_info = (
-            f"ckpt={ckpt_name} | family={detected_family}"
+        text_encoder, resolved_text_encoder_source = _resolve_text_encoder(
+            family=family,
+            source=text_encoder_source,
+            embedded_text_encoder=embedded_text_encoder,
+            external_name_1=external_text_encoder_1,
+            external_name_2=external_text_encoder_2,
+        )
+        vae, resolved_vae_source = _resolve_vae(
+            family=family,
+            source=vae_source,
+            embedded_vae=embedded_vae,
+            external_vae_name=external_vae_name,
         )
 
-        return (model, clip, vae, model_info)
+        latent_spec = get_latent_spec({"family": family})
+        model_info = build_model_info(
+            family=family,
+            model_name=ckpt_name,
+            model_source=model_source,
+            load_mode=load_mode,
+            text_encoder_source=resolved_text_encoder_source,
+            vae_source=resolved_vae_source,
+            text_encoder_type=_text_encoder_type_for_family(family),
+            has_embedded_vae=embedded_vae is not None,
+            has_embedded_text_encoder=embedded_text_encoder is not None,
+            required_text_encoders=_required_text_encoders_for_family(family),
+            required_vae=_required_vae_for_family(family),
+            is_turbo=(family == "SDXL_TURBO"),
+            guidance_embed=family_requires_guidance(family),
+            latent_channels=latent_spec["latent_channels"],
+            downscale_ratio=latent_spec["downscale_ratio"],
+        )
 
+        return (model, text_encoder, vae, model_info)
 
-# ---------- 注册表 ----------
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {
     "LLSSimpleCheckpointLoader": LLSSimpleCheckpointLoader,

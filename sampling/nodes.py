@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import random
 
+from ..utils.model_info import get_sampling_preset, parse_model_info
+
 # ---------- 防御性导入 ----------
 
 try:
@@ -52,12 +54,6 @@ except Exception:
 # ---------- 预设定义 ----------
 
 _QUALITY_PRESETS = ["Manual", "Fast", "Balanced", "High Quality"]
-
-_PRESET_PARAMS = {
-    "Fast":         {"steps": 12, "cfg": 6.5},
-    "Balanced":     {"steps": 20, "cfg": 7.0},
-    "High Quality": {"steps": 30, "cfg": 7.5},
-}
 
 _DEFAULT_SAMPLERS = ["euler", "euler_ancestral", "heun", "dpm_2", "dpm_2_ancestral",
                      "lms", "dpm_fast", "dpm_adaptive", "dpmpp_2s_ancestral",
@@ -208,7 +204,10 @@ class LLSSimpleKSampler:
                 "sampler_name": (_get_samplers(), {"default": "euler_ancestral"}),
                 "scheduler": (_get_schedulers(), {"default": "karras"}),
                 "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-            }
+            },
+            "optional": {
+                "model_info": ("STRING", {"default": ""}),
+            },
         }
 
     def sample(
@@ -224,6 +223,7 @@ class LLSSimpleKSampler:
         sampler_name: str,
         scheduler: str,
         denoise: float,
+        model_info: str | None = None,
     ):
         if comfy_sample is None:
             raise RuntimeError(
@@ -236,11 +236,13 @@ class LLSSimpleKSampler:
                 "Make sure this node runs inside a ComfyUI environment."
             ) from _COMFY_SAMPLERS_ERR
 
-        # 应用 quality_preset（Manual 不覆盖用户输入）
-        if quality_preset in _PRESET_PARAMS:
-            preset = _PRESET_PARAMS[quality_preset]
-            steps = preset["steps"]
-            cfg = preset["cfg"]
+        info = parse_model_info(model_info)
+        family = info["family"]
+
+        preset = get_sampling_preset(info, quality_preset)
+        if preset is not None:
+            steps = int(preset["steps"])
+            cfg = float(preset["cfg"])
 
         # seed = -1 时随机生成
         actual_seed = seed
@@ -269,7 +271,7 @@ class LLSSimpleKSampler:
         sample_info = (
             f"seed={actual_seed} | steps={steps} | cfg={cfg} "
             f"| sampler={sampler_name} | scheduler={scheduler} "
-            f"| denoise={denoise} | preset={quality_preset}"
+            f"| denoise={denoise} | preset={quality_preset} | family={family}"
         )
 
         return (result_latent, sample_info)

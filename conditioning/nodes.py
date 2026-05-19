@@ -7,31 +7,38 @@ CATEGORY = "LLS/Conditioning"
 """
 from __future__ import annotations
 
-# ---------- 防御性导入 ----------
-# （本节点直接调用 clip 对象方法，无需额外导入 comfy.sd）
+from ..utils.model_info import is_flux_family, is_sdxl_family, parse_model_info
+
 
 _CLIP_SKIP_CHOICES = [None] + list(range(-1, -25, -1))
 
 
-def _encode_conditioning(clip, prompt: str):
-    """
-    兼容新旧 ComfyUI 的文本编码入口。
+def _normalize_clip_skip(value) -> int:
+    if value in (None, "", "None"):
+        return -1
+    try:
+        normalized = int(value)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"[LLS] Invalid clip_skip value: {value!r}") from exc
+    if normalized < -24 or normalized > -1:
+        raise RuntimeError(f"[LLS] clip_skip out of supported range [-24, -1]: {normalized}")
+    return normalized
 
-    新版本优先使用 `encode_from_tokens_scheduled()`；
-    若运行环境较旧，仅存在 `encode_from_tokens()`，则手动包装成
-    ComfyUI 约定的 CONDITIONING 结构。
-    """
-    tokens = clip.tokenize(prompt)
 
+def _encode_tokens(clip, tokens, add_dict=None):
     scheduled = getattr(clip, "encode_from_tokens_scheduled", None)
     if callable(scheduled):
-        return scheduled(tokens)
+        try:
+            if add_dict:
+                return scheduled(tokens, add_dict=add_dict)
+            return scheduled(tokens)
+        except TypeError:
+            return scheduled(tokens)
 
     plain_encode = getattr(clip, "encode_from_tokens", None)
     if not callable(plain_encode):
         raise AttributeError(
-            "CLIP object does not expose encode_from_tokens_scheduled() "
-            "or encode_from_tokens()."
+            "CLIP object does not expose encode_from_tokens_scheduled() or encode_from_tokens()."
         )
 
     try:
@@ -51,30 +58,65 @@ def _encode_conditioning(clip, prompt: str):
     return [[cond, pooled_dict]]
 
 
-def _normalize_clip_skip(value) -> int:
-    """
-    兼容旧工作流中的 null / None，以及字符串形式的 clip_skip。
-    """
-    if value in (None, "", "None"):
-        return -1
-    try:
-        normalized = int(value)
-    except (TypeError, ValueError) as exc:
-        raise RuntimeError(f"[LLS] Invalid clip_skip value: {value!r}") from exc
-
-    if normalized < -24 or normalized > -1:
-        raise RuntimeError(f"[LLS] clip_skip out of supported range [-24, -1]: {normalized}")
-    return normalized
+def _encode_standard_prompt(clip, prompt: str):
+    tokens = clip.tokenize(prompt)
+    return _encode_tokens(clip, tokens)
 
 
-# ---------- 节点类 ----------
+def _build_sdxl_tokens(clip, prompt: str):
+    tokens = clip.tokenize(prompt)
+    local_tokens = clip.tokenize(prompt)
+
+    if "l" in local_tokens:
+        tokens["l"] = local_tokens["l"]
+    if "g" not in tokens and "g" in local_tokens:
+        tokens["g"] = local_tokens["g"]
+
+    if "l" in tokens and "g" in tokens and len(tokens["l"]) != len(tokens["g"]):
+        empty = clip.tokenize("")
+        while len(tokens["l"]) < len(tokens["g"]):
+            tokens["l"] += empty.get("l", [])
+        while len(tokens["g"]) < len(tokens["l"]):
+            tokens["g"] += empty.get("g", [])
+
+    return tokens
+
+
+def _encode_sdxl_prompt(clip, prompt: str, width: int, height: int):
+    tokens = _build_sdxl_tokens(clip, prompt)
+    add_dict = {
+        "width": width,
+        "height": height,
+        "crop_w": 0,
+        "crop_h": 0,
+        "target_width": width,
+        "target_height": height,
+    }
+    return _encode_tokens(clip, tokens, add_dict=add_dict)
+
+
+def _build_flux_tokens(clip, prompt: str):
+    tokens = clip.tokenize(prompt)
+    t5_tokens = clip.tokenize(prompt)
+    if "t5xxl" in t5_tokens:
+        tokens["t5xxl"] = t5_tokens["t5xxl"]
+    return tokens
+
+
+def _encode_flux_prompt(clip, prompt: str, guidance):
+    tokens = _build_flux_tokens(clip, prompt)
+    add_dict = {}
+    if guidance is not None:
+        add_dict["guidance"] = guidance
+    return _encode_tokens(clip, tokens, add_dict=add_dict or None)
+
 
 class LLSSimplePromptEncode:
     """
     简化版提示词编码节点。
-    优先复用 ComfyUI 原生 clip.encode_from_tokens_scheduled()，
-    旧版环境下自动回退到 encode_from_tokens()，
-    以兼容 SD1.5 / SDXL 的常见 CLIP 编码路径。
+
+    - 默认仍兼容原有 SD 风格 CLIP 编码。
+    - 若连接 model_info，则按 family 自动切换到 SDXL / FLUX 编码路径。
     """
 
     CATEGORY = "LLS/Conditioning"
@@ -82,66 +124,78 @@ class LLSSimplePromptEncode:
     RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "STRING")
     RETURN_NAMES = ("positive", "negative", "prompt_info")
     DESCRIPTION = (
-        "Encode positive and negative prompts into CONDITIONING tensors. "
-        "Prefers ComfyUI native encode_from_tokens_scheduled and falls back to "
-        "encode_from_tokens for older runtimes."
+        "Encode prompts into CONDITIONING tensors. Uses model_info when available to "
+        "dispatch between SD15, SDXL, and FLUX text-encoding paths."
     )
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "clip": ("CLIP",),
+                "text_encoder": ("CLIP",),
                 "positive_prompt": ("STRING", {"default": "", "multiline": True}),
                 "negative_prompt": ("STRING", {"default": "", "multiline": True}),
                 "clip_skip": (_CLIP_SKIP_CHOICES, {"default": -1}),
-            }
+            },
+            "optional": {
+                "model_info": ("STRING", {"default": ""}),
+            },
         }
 
-    def encode(self, clip, positive_prompt: str, negative_prompt: str, clip_skip):
-        if clip is None:
+    def encode(
+        self,
+        text_encoder,
+        positive_prompt: str,
+        negative_prompt: str,
+        clip_skip,
+        model_info: str | None = None,
+    ):
+        if text_encoder is None:
             raise RuntimeError(
-                "[LLS] CLIP is None. Make sure a checkpoint is loaded before connecting to this node."
+                "[LLS] text_encoder is None. Connect the loader output or load a compatible text encoder first."
             )
 
+        info = parse_model_info(model_info)
+        family = info["family"]
         clip_skip = _normalize_clip_skip(clip_skip)
 
-        # 应用 clip_skip（ComfyUI CLIP 对象支持 clip_layer）
         if clip_skip != -1:
             try:
-                clip = clip.clone()
-                clip.clip_layer(clip_skip)
+                text_encoder = text_encoder.clone()
+                text_encoder.clip_layer(clip_skip)
             except Exception:
-                # clip_layer 不可用时静默忽略，不阻断流程
                 pass
 
-        # 编码 positive — 复用 ComfyUI 原生编码入口
         try:
-            positive = _encode_conditioning(clip, positive_prompt)
+            if is_flux_family(family):
+                guidance = info.get("guidance") if info.get("guidance_embed") else None
+                positive = _encode_flux_prompt(text_encoder, positive_prompt, guidance)
+                negative = _encode_flux_prompt(text_encoder, "", guidance)
+                negative_note = "negative_ignored_for_flux"
+            elif is_sdxl_family(family):
+                width = int(info.get("base_width", 1024))
+                height = int(info.get("base_height", 1024))
+                positive = _encode_sdxl_prompt(text_encoder, positive_prompt, width, height)
+                negative = _encode_sdxl_prompt(text_encoder, negative_prompt, width, height)
+                negative_note = "negative_used"
+            else:
+                positive = _encode_standard_prompt(text_encoder, positive_prompt)
+                negative = _encode_standard_prompt(text_encoder, negative_prompt)
+                negative_note = "negative_used"
         except Exception as exc:
-            raise RuntimeError(
-                f"[LLS] Failed to encode positive prompt: {exc}"
-            ) from exc
-
-        # 编码 negative — 复用 ComfyUI 原生编码入口
-        try:
-            negative = _encode_conditioning(clip, negative_prompt)
-        except Exception as exc:
-            raise RuntimeError(
-                f"[LLS] Failed to encode negative prompt: {exc}"
-            ) from exc
+            raise RuntimeError(f"[LLS] Failed to encode prompts for family {family}: {exc}") from exc
 
         pos_preview = positive_prompt[:60].replace("\n", " ")
         neg_preview = negative_prompt[:40].replace("\n", " ")
+        if is_flux_family(family):
+            neg_preview = ""
         prompt_info = (
-            f"clip_skip={clip_skip} "
-            f"| pos=\"{pos_preview}...\" | neg=\"{neg_preview}...\""
+            f"family={family} | clip_skip={clip_skip} | "
+            f"pos=\"{pos_preview}...\" | neg=\"{neg_preview}...\" | {negative_note}"
         )
 
         return (positive, negative, prompt_info)
 
-
-# ---------- 注册表 ----------
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {
     "LLSSimplePromptEncode": LLSSimplePromptEncode,
