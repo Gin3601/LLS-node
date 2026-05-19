@@ -9,7 +9,14 @@ from __future__ import annotations
 
 import random
 
-from ..utils.model_info import get_sampling_preset, parse_model_info
+from ..utils.model_info import (
+    FAMILY_DEFAULT_PRESET,
+    LLS_MODEL_INFO_TYPE,
+    get_sampling_preset,
+    info_to_json,
+    is_flux_family,
+    parse_model_info,
+)
 
 # ---------- 防御性导入 ----------
 
@@ -50,10 +57,15 @@ try:
 except Exception:
     torch = None
 
+try:
+    import node_helpers
+except Exception:
+    node_helpers = None
+
 
 # ---------- 预设定义 ----------
 
-_QUALITY_PRESETS = ["Manual", "Fast", "Balanced", "High Quality"]
+_QUALITY_PRESETS = [FAMILY_DEFAULT_PRESET, "Manual", "Fast", "Balanced", "High Quality"]
 
 _DEFAULT_SAMPLERS = ["euler", "euler_ancestral", "heun", "dpm_2", "dpm_2_ancestral",
                      "lms", "dpm_fast", "dpm_adaptive", "dpmpp_2s_ancestral",
@@ -197,16 +209,17 @@ class LLSSimpleKSampler:
                 "positive": ("CONDITIONING",),
                 "negative": ("CONDITIONING",),
                 "latent_image": ("LATENT",),
-                "quality_preset": (_QUALITY_PRESETS, {"default": "Balanced"}),
+                "quality_preset": (_QUALITY_PRESETS, {"default": FAMILY_DEFAULT_PRESET}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xFFFFFFFFFFFFFFFF}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
                 "cfg": ("FLOAT", {"default": 7.0, "min": 0.0, "max": 100.0, "step": 0.1}),
                 "sampler_name": (_get_samplers(), {"default": "euler_ancestral"}),
                 "scheduler": (_get_schedulers(), {"default": "karras"}),
                 "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "flux_guidance": ("FLOAT", {"default": 3.5, "min": 0.0, "max": 100.0, "step": 0.1}),
             },
             "optional": {
-                "model_info": ("STRING", {"default": ""}),
+                "model_info": (LLS_MODEL_INFO_TYPE,),
             },
         }
 
@@ -223,7 +236,8 @@ class LLSSimpleKSampler:
         sampler_name: str,
         scheduler: str,
         denoise: float,
-        model_info: str | None = None,
+        flux_guidance: float,
+        model_info=None,
     ):
         if comfy_sample is None:
             raise RuntimeError(
@@ -243,6 +257,18 @@ class LLSSimpleKSampler:
         if preset is not None:
             steps = int(preset["steps"])
             cfg = float(preset["cfg"])
+            sampler_name = str(preset["sampler_name"])
+            scheduler = str(preset["scheduler"])
+            denoise = float(preset["denoise"])
+            if preset.get("guidance") is not None:
+                flux_guidance = float(preset["guidance"])
+
+        if is_flux_family(family) and node_helpers is not None:
+            try:
+                positive = node_helpers.conditioning_set_values(positive, {"guidance": flux_guidance})
+                negative = node_helpers.conditioning_set_values(negative, {"guidance": flux_guidance})
+            except Exception:
+                pass
 
         # seed = -1 时随机生成
         actual_seed = seed
@@ -268,10 +294,19 @@ class LLSSimpleKSampler:
                 f"[LLS] KSampler failed: {exc}"
             ) from exc
 
-        sample_info = (
-            f"seed={actual_seed} | steps={steps} | cfg={cfg} "
-            f"| sampler={sampler_name} | scheduler={scheduler} "
-            f"| denoise={denoise} | preset={quality_preset} | family={family}"
+        guidance_value = flux_guidance if is_flux_family(family) else None
+        sample_info = info_to_json(
+            {
+                "seed": actual_seed,
+                "steps": steps,
+                "cfg": cfg,
+                "guidance": guidance_value,
+                "sampler_name": sampler_name,
+                "scheduler": scheduler,
+                "denoise": denoise,
+                "quality_preset": quality_preset,
+                "family": family,
+            }
         )
 
         return (result_latent, sample_info)

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..utils.model_info import LLS_MODEL_INFO_TYPE, info_to_json, parse_model_info
+
 # ---------- 从根模块导入共享工具函数 ----------
 
 from ..nodes import (
@@ -56,7 +58,7 @@ else:
 
 # ---------- 常量 ----------
 
-UPSCALE_MODE_CHOICES = ["upscale_model", "pytorch"]
+UPSCALE_MODE_CHOICES = ["none", "interpolation", "upscale_model", "latent_upscale", "tile_upscale", "pytorch"]
 INTERPOLATION_CHOICES = ["nearest", "bilinear", "bicubic", "area"]
 NO_UPSCALE_MODEL_PLACEHOLDER = "(no upscale models found)"
 
@@ -214,13 +216,14 @@ class LLSUpscaleSwitcher:
 
     CATEGORY = "LLS/Upscale"
     FUNCTION = "upscale"
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("image", "upscale_info")
     DESCRIPTION = "Switch between ComfyUI upscale models and PyTorch interpolation."
 
     @classmethod
     def INPUT_TYPES(cls):
         model_names = _sorted_unique(_get_upscale_model_names())
-        default_mode = "upscale_model" if _has_real_upscale_models(model_names) else "pytorch"
+        default_mode = "upscale_model" if _has_real_upscale_models(model_names) else "interpolation"
         return {
             "required": {
                 "image": ("IMAGE",),
@@ -230,21 +233,99 @@ class LLSUpscaleSwitcher:
                 "model_name": (model_names,),
                 "tile": ("INT", {"default": 512, "min": 128, "max": 2048, "step": 64}),
                 "overlap": ("INT", {"default": 32, "min": 0, "max": 256, "step": 8}),
-            }
+            },
+            "optional": {
+                "model_info": (LLS_MODEL_INFO_TYPE,),
+            },
         }
 
-    def upscale(self, image, mode: str, scale: float, interpolation: str, model_name: str, tile: int, overlap: int):
+    def upscale(self, image, mode: str, scale: float, interpolation: str, model_name: str, tile: int, overlap: int, model_info=None):
+        info = parse_model_info(model_info)
+        requested_mode = mode
+        warning = None
         if mode not in UPSCALE_MODE_CHOICES:
             raise RuntimeError(f"Unsupported mode '{mode}'. Expected one of {UPSCALE_MODE_CHOICES}.")
-        if mode == "pytorch":
-            return self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)
+        if mode == "none":
+            return (
+                image,
+                info_to_json(
+                    {
+                        "mode": "none",
+                        "requested_mode": requested_mode,
+                        "scale": 1.0,
+                        "family": info["family"],
+                        "warning": None,
+                    }
+                ),
+            )
+        if mode in {"interpolation", "pytorch"}:
+            result = self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)[0]
+            return (
+                result,
+                info_to_json(
+                    {
+                        "mode": "interpolation",
+                        "requested_mode": requested_mode,
+                        "scale": scale,
+                        "interpolation": interpolation,
+                        "family": info["family"],
+                        "warning": None,
+                    }
+                ),
+            )
+        if mode == "latent_upscale":
+            warning = "latent_upscale_not_available_on_IMAGE_input_fallback_to_interpolation"
+            result = self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)[0]
+            return (
+                result,
+                info_to_json(
+                    {
+                        "mode": "interpolation",
+                        "requested_mode": requested_mode,
+                        "scale": scale,
+                        "interpolation": interpolation,
+                        "family": info["family"],
+                        "warning": warning,
+                    }
+                ),
+            )
         if _is_missing_upscale_model_selection(model_name):
+            warning = "no_upscale_model_found_fallback_to_interpolation"
             print(
                 "[LLS] WARNING: No valid upscale model is selected. "
-                "Falling back to PyTorch interpolation mode."
+                "Falling back to interpolation mode."
             )
-            return self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)
-        return self._upscale_with_model(image=image, model_name=model_name, tile=tile, overlap=overlap)
+            result = self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)[0]
+            return (
+                result,
+                info_to_json(
+                    {
+                        "mode": "interpolation",
+                        "requested_mode": requested_mode,
+                        "scale": scale,
+                        "interpolation": interpolation,
+                        "family": info["family"],
+                        "warning": warning,
+                    }
+                ),
+            )
+        result = self._upscale_with_model(image=image, model_name=model_name, tile=tile, overlap=overlap)[0]
+        actual_mode = "tile_upscale" if requested_mode == "tile_upscale" else "upscale_model"
+        return (
+            result,
+            info_to_json(
+                {
+                    "mode": actual_mode,
+                    "requested_mode": requested_mode,
+                    "scale": scale,
+                    "model_name": model_name,
+                    "tile": tile,
+                    "overlap": overlap,
+                    "family": info["family"],
+                    "warning": warning,
+                }
+            ),
+        )
 
     def _upscale_with_pytorch(self, image, scale: float, interpolation: str):
         _require_torch()

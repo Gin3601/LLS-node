@@ -7,7 +7,14 @@ CATEGORY = "LLS/Conditioning"
 """
 from __future__ import annotations
 
-from ..utils.model_info import is_flux_family, is_sdxl_family, parse_model_info
+from ..utils.model_info import (
+    LLS_MODEL_INFO_TYPE,
+    LLS_TEXT_ENCODER_TYPE,
+    info_to_json,
+    is_flux_family,
+    is_sdxl_family,
+    parse_model_info,
+)
 
 
 _CLIP_SKIP_CHOICES = [None] + list(range(-1, -25, -1))
@@ -113,10 +120,11 @@ def _encode_flux_prompt(clip, prompt: str, guidance):
 
 class LLSSimplePromptEncode:
     """
-    简化版提示词编码节点。
+    家族感知的提示词编码节点。
 
-    - 默认仍兼容原有 SD 风格 CLIP 编码。
-    - 若连接 model_info，则按 family 自动切换到 SDXL / FLUX 编码路径。
+    - `text_encoder` 为新接口。
+    - `clip` 保留作旧工作流兼容入口。
+    - `model_info` 未连接时，会退回 SD1.5 默认逻辑。
     """
 
     CATEGORY = "LLS/Conditioning"
@@ -125,34 +133,38 @@ class LLSSimplePromptEncode:
     RETURN_NAMES = ("positive", "negative", "prompt_info")
     DESCRIPTION = (
         "Encode prompts into CONDITIONING tensors. Uses model_info when available to "
-        "dispatch between SD15, SDXL, and FLUX text-encoding paths."
+        "dispatch between SD1.5, SDXL, SDXL Turbo, and FLUX text-encoding paths."
     )
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "text_encoder": ("CLIP",),
                 "positive_prompt": ("STRING", {"default": "", "multiline": True}),
                 "negative_prompt": ("STRING", {"default": "", "multiline": True}),
                 "clip_skip": (_CLIP_SKIP_CHOICES, {"default": -1}),
             },
             "optional": {
-                "model_info": ("STRING", {"default": ""}),
+                "text_encoder": (LLS_TEXT_ENCODER_TYPE,),
+                "clip": ("CLIP",),
+                "model_info": (LLS_MODEL_INFO_TYPE,),
             },
         }
 
     def encode(
         self,
-        text_encoder,
-        positive_prompt: str,
-        negative_prompt: str,
-        clip_skip,
-        model_info: str | None = None,
+        text_encoder=None,
+        positive_prompt: str = "",
+        negative_prompt: str = "",
+        clip_skip=-1,
+        model_info=None,
+        clip=None,
     ):
-        if text_encoder is None:
+        encoder = text_encoder if text_encoder is not None else clip
+        if encoder is None:
             raise RuntimeError(
-                "[LLS] text_encoder is None. Connect the loader output or load a compatible text encoder first."
+                "[LLS] Missing text encoder. Connect 'text_encoder' from LLS Simple Checkpoint Loader "
+                "or the legacy 'clip' input."
             )
 
         info = parse_model_info(model_info)
@@ -161,39 +173,45 @@ class LLSSimplePromptEncode:
 
         if clip_skip != -1:
             try:
-                text_encoder = text_encoder.clone()
-                text_encoder.clip_layer(clip_skip)
+                encoder = encoder.clone()
+                encoder.clip_layer(clip_skip)
             except Exception:
                 pass
 
+        negative_mode = "standard"
+        negative_for_encode = negative_prompt
+
+        if family == "SDXL_TURBO" and negative_prompt.strip():
+            negative_for_encode = ""
+            negative_mode = "weakened_for_turbo"
+
         try:
             if is_flux_family(family):
-                guidance = info.get("guidance") if info.get("guidance_embed") else None
-                positive = _encode_flux_prompt(text_encoder, positive_prompt, guidance)
-                negative = _encode_flux_prompt(text_encoder, "", guidance)
-                negative_note = "negative_ignored_for_flux"
+                guidance = info.get("guidance", info.get("default_guidance"))
+                positive = _encode_flux_prompt(encoder, positive_prompt, guidance)
+                negative = _encode_flux_prompt(encoder, "", guidance)
+                negative_mode = "ignored_for_flux"
             elif is_sdxl_family(family):
-                width = int(info.get("base_width", 1024))
-                height = int(info.get("base_height", 1024))
-                positive = _encode_sdxl_prompt(text_encoder, positive_prompt, width, height)
-                negative = _encode_sdxl_prompt(text_encoder, negative_prompt, width, height)
-                negative_note = "negative_used"
+                width = int(info.get("default_width", 1024))
+                height = int(info.get("default_height", 1024))
+                positive = _encode_sdxl_prompt(encoder, positive_prompt, width, height)
+                negative = _encode_sdxl_prompt(encoder, negative_for_encode, width, height)
             else:
-                positive = _encode_standard_prompt(text_encoder, positive_prompt)
-                negative = _encode_standard_prompt(text_encoder, negative_prompt)
-                negative_note = "negative_used"
+                positive = _encode_standard_prompt(encoder, positive_prompt)
+                negative = _encode_standard_prompt(encoder, negative_for_encode)
         except Exception as exc:
             raise RuntimeError(f"[LLS] Failed to encode prompts for family {family}: {exc}") from exc
 
-        pos_preview = positive_prompt[:60].replace("\n", " ")
-        neg_preview = negative_prompt[:40].replace("\n", " ")
-        if is_flux_family(family):
-            neg_preview = ""
-        prompt_info = (
-            f"family={family} | clip_skip={clip_skip} | "
-            f"pos=\"{pos_preview}...\" | neg=\"{neg_preview}...\" | {negative_note}"
+        prompt_info = info_to_json(
+            {
+                "positive_prompt": positive_prompt,
+                "negative_prompt": negative_prompt,
+                "family": family,
+                "text_encoder_type": info.get("text_encoder_type", "clip"),
+                "clip_skip": clip_skip,
+                "negative_mode": negative_mode,
+            }
         )
-
         return (positive, negative, prompt_info)
 
 

@@ -32,6 +32,16 @@ LLS / Utils
 """
 from __future__ import annotations
 
+from .model_info import (
+    FAMILY_DEFAULT_PRESET,
+    LLS_MODEL_INFO_TYPE,
+    SIZE_PRESET_AUTO,
+    get_family_defaults,
+    get_sampling_preset,
+    info_to_json,
+    parse_model_info,
+)
+
 
 # ---------- 节点类示例（基础类型，纯 Python 无外部依赖） ----------
 
@@ -142,6 +152,81 @@ class LLSResolutionSelector:
         return (int(w), int(h))
 
 
+class LLSGenerationConfig:
+    """按模型家族输出推荐分辨率与采样配置。"""
+
+    CATEGORY = "LLS/Utils"
+    FUNCTION = "execute"
+    RETURN_TYPES = ("INT", "INT", "INT", "FLOAT", "FLOAT", "STRING", "STRING", "FLOAT", "STRING")
+    RETURN_NAMES = ("width", "height", "steps", "cfg", "guidance", "sampler_name", "scheduler", "denoise", "config_info")
+    DESCRIPTION = "Generate family-aware default width/height and sampling parameters."
+
+    _QUALITY_PRESETS = [FAMILY_DEFAULT_PRESET, "Manual", "Fast", "Balanced", "High Quality"]
+    _SIZE_PRESETS = [SIZE_PRESET_AUTO, "Custom", "512x512", "768x768", "1024x1024"]
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "quality_preset": (cls._QUALITY_PRESETS, {"default": FAMILY_DEFAULT_PRESET}),
+                "size_preset": (cls._SIZE_PRESETS, {"default": SIZE_PRESET_AUTO}),
+            },
+            "optional": {
+                "model_info": (LLS_MODEL_INFO_TYPE,),
+            },
+        }
+
+    def execute(self, quality_preset: str, size_preset: str, model_info=None):
+        info = parse_model_info(model_info)
+        defaults = get_family_defaults(info["family"])
+        preset = get_sampling_preset(info, quality_preset) or {
+            "steps": defaults["default_steps"],
+            "cfg": defaults["default_cfg"],
+            "guidance": defaults["default_guidance"],
+            "sampler_name": defaults["default_sampler"],
+            "scheduler": defaults["default_scheduler"],
+            "denoise": defaults["default_denoise"],
+        }
+
+        if size_preset == SIZE_PRESET_AUTO:
+            width = defaults["default_width"]
+            height = defaults["default_height"]
+        elif size_preset == "Custom":
+            width = defaults["default_width"]
+            height = defaults["default_height"]
+        else:
+            width, height = [int(part) for part in size_preset.split("x", 1)]
+
+        guidance = preset.get("guidance")
+        guidance = 0.0 if guidance is None else float(guidance)
+        config_info = info_to_json(
+            {
+                "family": info["family"],
+                "width": width,
+                "height": height,
+                "steps": int(preset["steps"]),
+                "cfg": float(preset["cfg"]),
+                "guidance": guidance,
+                "sampler_name": str(preset["sampler_name"]),
+                "scheduler": str(preset["scheduler"]),
+                "denoise": float(preset["denoise"]),
+                "quality_preset": quality_preset,
+                "size_preset": size_preset,
+            }
+        )
+        return (
+            int(width),
+            int(height),
+            int(preset["steps"]),
+            float(preset["cfg"]),
+            guidance,
+            str(preset["sampler_name"]),
+            str(preset["scheduler"]),
+            float(preset["denoise"]),
+            config_info,
+        )
+
+
 # ---------- 注册表 ----------
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {
@@ -149,6 +234,7 @@ NODE_CLASS_MAPPINGS: dict[str, type] = {
     "LLSIntLiteral": LLSIntLiteral,
     "LLSFloatLiteral": LLSFloatLiteral,
     "LLSResolutionSelector": LLSResolutionSelector,
+    "LLSGenerationConfig": LLSGenerationConfig,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
@@ -156,4 +242,5 @@ NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
     "LLSIntLiteral": "LLS Int Literal",
     "LLSFloatLiteral": "LLS Float Literal",
     "LLSResolutionSelector": "LLS Resolution Selector",
+    "LLSGenerationConfig": "LLS Generation Config",
 }

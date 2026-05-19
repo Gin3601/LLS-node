@@ -20,12 +20,21 @@ try:
 except Exception:
     model_management = None
 
-from ..utils.model_info import get_latent_spec, parse_model_info
+from ..utils.model_info import (
+    LLS_MODEL_INFO_TYPE,
+    SIZE_PRESET_AUTO,
+    get_family_defaults,
+    get_latent_spec,
+    info_to_json,
+    parse_model_info,
+)
 
 
 _SIZE_PRESETS = [
+    SIZE_PRESET_AUTO,
     "Custom",
     "512x512",
+    "768x768",
     "512x768",
     "768x512",
     "1024x1024",
@@ -44,10 +53,10 @@ def _round_to_multiple(value: int, multiple: int) -> int:
 
 class LLSSimpleEmptyLatent:
     """
-    生成空白 Latent，作为 txt2img 推理的起点。
+    生成空白 Latent，作为 txt2img 推理起点。
 
-    默认保持 SD 风格 4 通道 / 8x 下采样；
-    若提供 model_info，则可自动切换到 FLUX 的 128 通道 / 16x 下采样。
+    - `Family Default` 时按照 model_info.family 自动取默认尺寸。
+    - `Custom` 时才使用手填 width / height。
     """
 
     CATEGORY = "LLS/Latent"
@@ -56,20 +65,20 @@ class LLSSimpleEmptyLatent:
     RETURN_NAMES = ("latent", "width", "height", "latent_info")
     DESCRIPTION = (
         "Create an empty latent image as the starting point for txt2img. "
-        "When model_info is connected, latent channels and downscale ratio adapt to the model family."
+        "Uses family defaults when size_preset is 'Family Default'."
     )
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "size_preset": (_SIZE_PRESETS, {"default": "512x512"}),
+                "size_preset": (_SIZE_PRESETS, {"default": SIZE_PRESET_AUTO}),
                 "width": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 8}),
                 "height": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 8}),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
             },
             "optional": {
-                "model_info": ("STRING", {"default": ""}),
+                "model_info": (LLS_MODEL_INFO_TYPE,),
             },
         }
 
@@ -79,7 +88,7 @@ class LLSSimpleEmptyLatent:
         width: int,
         height: int,
         batch_size: int,
-        model_info: str | None = None,
+        model_info=None,
     ):
         if torch is None:
             raise RuntimeError(
@@ -87,22 +96,22 @@ class LLSSimpleEmptyLatent:
             ) from _TORCH_ERR
 
         info = parse_model_info(model_info)
+        family_defaults = get_family_defaults(info["family"])
         latent_spec = get_latent_spec(info)
         latent_channels = latent_spec["latent_channels"]
         downscale_ratio = latent_spec["downscale_ratio"]
-        notes = []
 
-        if size_preset != "Custom":
+        if size_preset == SIZE_PRESET_AUTO:
+            width = int(family_defaults["default_width"])
+            height = int(family_defaults["default_height"])
+        elif size_preset != "Custom":
             try:
                 width, height = [int(part) for part in size_preset.split("x", 1)]
-            except Exception:
-                notes.append(f"preset parse failed, using custom {width}x{height}")
+            except Exception as exc:
+                raise RuntimeError(f"[LLS] Invalid size_preset value '{size_preset}': {exc}") from exc
 
-        corrected_w = _round_to_multiple(width, downscale_ratio)
-        corrected_h = _round_to_multiple(height, downscale_ratio)
-        if corrected_w != width or corrected_h != height:
-            notes.append(f"size corrected {width}x{height} -> {corrected_w}x{corrected_h}")
-        width, height = corrected_w, corrected_h
+        width = _round_to_multiple(int(width), downscale_ratio)
+        height = _round_to_multiple(int(height), downscale_ratio)
 
         device = "cpu"
         dtype = torch.float32
@@ -122,10 +131,16 @@ class LLSSimpleEmptyLatent:
             dtype=dtype,
         )
 
-        note_str = " | ".join(notes) if notes else "ok"
-        latent_info = (
-            f"family={info['family']} | size={width}x{height} | batch={batch_size} | "
-            f"channels={latent_channels} | downscale={downscale_ratio} | preset={size_preset} | {note_str}"
+        latent_info = info_to_json(
+            {
+                "family": info["family"],
+                "width": width,
+                "height": height,
+                "batch_size": batch_size,
+                "latent_channels": latent_channels,
+                "downscale_ratio": downscale_ratio,
+                "size_preset": size_preset,
+            }
         )
 
         return (

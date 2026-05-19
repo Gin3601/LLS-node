@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import pathlib
 import sys
 import unittest
@@ -82,7 +83,7 @@ class TestConditioningCompatibility(unittest.TestCase):
             negative,
             [["cond::low quality", {"pooled_output": "pooled::low quality"}]],
         )
-        self.assertIn("clip_skip=-2", prompt_info)
+        self.assertEqual(json.loads(prompt_info)["clip_skip"], -2)
 
     def test_simple_prompt_encode_normalizes_none_clip_skip(self):
         plugin = load_plugin_package()
@@ -104,7 +105,7 @@ class TestConditioningCompatibility(unittest.TestCase):
             negative,
             [["cond::low quality", {"pooled_output": "pooled::low quality"}]],
         )
-        self.assertIn("clip_skip=-1", prompt_info)
+        self.assertEqual(json.loads(prompt_info)["clip_skip"], -1)
 
     def test_universal_backend_falls_back_for_legacy_clip(self):
         load_plugin_package()
