@@ -7,8 +7,6 @@ from typing import Any
 
 
 LLS_TEXT_ENCODER_TYPE = "LLS_TEXT_ENCODER"
-LLS_MODEL_INFO_TYPE = "LLS_MODEL_INFO"
-
 AUTO_FAMILY = "Auto"
 FAMILY_DEFAULT_PRESET = "Family Default"
 SIZE_PRESET_AUTO = "Family Default"

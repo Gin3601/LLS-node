@@ -490,6 +490,31 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(sample_data["sampler_name"], "euler")
         self.assertEqual(latent["samples"].shape, (1, 4, 64, 64))
 
+    def test_ksampler_schema_appends_model_family_after_legacy_widgets(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimpleKSampler"]
+        required = node_cls.INPUT_TYPES()["required"]
+
+        self.assertEqual(
+            tuple(required.keys()),
+            (
+                "model",
+                "positive",
+                "negative",
+                "latent_image",
+                "quality_preset",
+                "seed",
+                "steps",
+                "cfg",
+                "sampler_name",
+                "scheduler",
+                "denoise",
+                "flux_guidance",
+                "model_family",
+            ),
+        )
+        self.assertEqual(required["model_family"][1]["default"], "Auto")
+
     def test_ksampler_accepts_blank_flux_guidance_for_legacy_workflows(self):
         load_plugin_package()
         from lls_node_test_refactor.sampling import nodes as sampling_nodes
@@ -710,6 +735,10 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(required["model_family"][1]["default"], "Auto")
         self.assertEqual(optional["model"][0], "MODEL")
         self.assertEqual(optional["clip"][0], "CLIP")
+        self.assertEqual(
+            tuple(required.keys()),
+            ("quality_preset", "size_preset", "model_family"),
+        )
 
         width, height, steps, cfg, guidance, sampler_name, scheduler, denoise, config_info = node.execute(
             quality_preset="Family Default",

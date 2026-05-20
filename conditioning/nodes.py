@@ -123,7 +123,7 @@ class LLSSimplePromptEncode:
     家族感知的提示词编码节点。
     - `text_encoder` 与 `clip` 都使用原生 CLIP 端口类型。
     - `model_family` 默认 Auto，从 CLIP tokenizer 或对象标记推断家族。
-    - 输出 prompt_info JSON，而不是 task_context 透传对象。
+    - 输出 `prompt_info` JSON，而不是透传上下文对象。
     """
 
     CATEGORY = "LLS/Conditioning"

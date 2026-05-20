@@ -230,7 +230,6 @@ class LLSSimpleKSampler:
                 "positive": ("CONDITIONING",),
                 "negative": ("CONDITIONING",),
                 "latent_image": ("LATENT",),
-                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
                 "quality_preset": (_QUALITY_PRESETS, {"default": FAMILY_DEFAULT_PRESET}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xFFFFFFFFFFFFFFFF}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
@@ -242,6 +241,7 @@ class LLSSimpleKSampler:
                     _PRIMITIVE_NUMBER_INPUT,
                     {"default": 3.5, "widgetType": "FLOAT", "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.1},
                 ),
+                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
             },
         }
 
@@ -264,7 +264,6 @@ class LLSSimpleKSampler:
         positive,
         negative,
         latent_image,
-        model_family: str,
         quality_preset: str,
         seed: int,
         steps: int,
@@ -273,6 +272,7 @@ class LLSSimpleKSampler:
         scheduler: str,
         denoise: float,
         flux_guidance,
+        model_family: str = "Auto",
     ):
         if comfy_sample is None:
             raise RuntimeError(

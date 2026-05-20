@@ -168,9 +168,9 @@ class LLSGenerationConfig:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
                 "quality_preset": (cls._QUALITY_PRESETS, {"default": FAMILY_DEFAULT_PRESET}),
                 "size_preset": (cls._SIZE_PRESETS, {"default": SIZE_PRESET_AUTO}),
+                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
             },
             "optional": {
                 "model": ("MODEL",),
@@ -178,7 +178,7 @@ class LLSGenerationConfig:
             },
         }
 
-    def execute(self, model_family: str, quality_preset: str, size_preset: str, model=None, clip=None):
+    def execute(self, quality_preset: str, size_preset: str, model_family: str = "Auto", model=None, clip=None):
         family = resolve_model_family(model_family, model=model, clip=clip)
         defaults = get_family_defaults(family)
         preset = get_sampling_preset(defaults, quality_preset) or {

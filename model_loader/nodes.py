@@ -354,7 +354,7 @@ class LLSSimpleCheckpointLoader:
     输出结构固定为 model / clip / vae / text_encoder。
     - `clip` 保留旧工作流需要的原生 CLIP 端口类型和位置。
     - `text_encoder` 是同一个原生 CLIP 对象的兼容别名。
-    - 轻量级模型信息写入原生对象 `_lls_*` 属性，不再额外输出 task_context。
+    - 轻量级模型信息写入原生对象 `_lls_*` 属性，不再额外输出额外上下文端口。
     """
 
     CATEGORY = "LLS/Model Loader"
