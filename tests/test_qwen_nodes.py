@@ -6,6 +6,7 @@ from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+QWEN_LORA_STACK_TYPE = "LLS_QWEN_LORA_STACK"
 
 
 def load_plugin_package():
@@ -22,6 +23,10 @@ def load_plugin_package():
     sys.modules["lls_node_test_qwen"] = module
     spec.loader.exec_module(module)
     return module
+
+
+def make_lora_stack(*entries):
+    return [{"lora_name": name, "strength_model": strength} for name, strength in entries]
 
 
 class NodeOutputStub:
@@ -42,12 +47,22 @@ class QwenFolderPathsStub:
             "diffusion_models": [
                 "qwen_image_fp8_e4m3fn.safetensors",
                 "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "qwen_image_edit_2509_fp8_e4m3fn.safetensors",
                 "qwen_image_edit_2511_bf16.safetensors",
                 "qwen_image_layered_bf16.safetensors",
                 "flux1-dev.safetensors",
             ],
             "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
             "vae": ["qwen_image_vae.safetensors"],
+            "loras": [
+                "qwen-style-a.safetensors",
+                "qwen-style-b.safetensors",
+                "Qwen-Image-Lightning-8steps-V1.0.safetensors",
+                "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
+                "Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors",
+                "Qwen-Image-Edit-2511-Lightning-4steps-V1.0.safetensors",
+                "flux-dev-style.safetensors",
+            ],
         }
 
     def get_filename_list(self, category):
@@ -73,6 +88,7 @@ class CoreQwenNodesStub:
     last_vae_encode_call = None
     last_vae_decode_call = None
     last_vae_load_call = None
+    last_lora_calls = []
 
     @classmethod
     def reset(cls):
@@ -83,6 +99,7 @@ class CoreQwenNodesStub:
         cls.last_vae_encode_call = None
         cls.last_vae_decode_call = None
         cls.last_vae_load_call = None
+        cls.last_lora_calls = []
 
     class UNETLoader:
         def load_unet(self, unet_name, weight_dtype):
@@ -116,6 +133,17 @@ class CoreQwenNodesStub:
                 }
             )
             return (f"COND::{text}",)
+
+    class LoraLoaderModelOnly:
+        def load_lora_model_only(self, model, lora_name, strength_model):
+            CoreQwenNodesStub.last_lora_calls.append(
+                {
+                    "model": model,
+                    "lora_name": lora_name,
+                    "strength_model": strength_model,
+                }
+            )
+            return (f"LORA::{model}::{lora_name}::{strength_model}",)
 
     class KSampler:
         def sample(
@@ -244,7 +272,7 @@ class QwenExtraNodesStub:
                     "image3": image3,
                 }
             )
-            return NodeOutputStub(f"EDIT_COND::{prompt}::{image1}")
+            return NodeOutputStub(f"EDIT_COND::{prompt}::{image1}::{image2}::{image3}")
 
 
 class CFGNodesStub:
@@ -275,6 +303,7 @@ class TestQwenNodes(unittest.TestCase):
 
         self.assertIn("LLSQwenTextToImage", plugin.NODE_CLASS_MAPPINGS)
         self.assertIn("LLSQwenImageEdit", plugin.NODE_CLASS_MAPPINGS)
+        self.assertIn("LLSQwenLoRAStack", plugin.NODE_CLASS_MAPPINGS)
 
     def test_qwen_text_node_filters_only_text_models(self):
         load_plugin_package()
@@ -300,19 +329,136 @@ class TestQwenNodes(unittest.TestCase):
         with mock.patch.object(qwen_discovery, "folder_paths", QwenFolderPathsStub()):
             choices = qwen_nodes.LLSQwenImageEdit.INPUT_TYPES()["required"]["model_name"][0]
 
-        self.assertEqual(choices, ["qwen_image_edit_2511_bf16.safetensors"])
+        self.assertEqual(
+            choices,
+            [
+                "qwen_image_edit_2509_fp8_e4m3fn.safetensors",
+                "qwen_image_edit_2511_bf16.safetensors",
+            ],
+        )
 
-    def test_qwen_text_node_uses_placeholder_when_no_compatible_models_exist(self):
+    def test_qwen_text_node_schema_exposes_advanced_inputs_and_optional_lora_stack(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSQwenTextToImage"]
+        required = node_cls.INPUT_TYPES()["required"]
+        optional = node_cls.INPUT_TYPES()["optional"]
+
+        self.assertEqual(node_cls.RETURN_TYPES, ("IMAGE",))
+        self.assertEqual(node_cls.RETURN_NAMES, ("image",))
+        self.assertEqual(
+            tuple(required.keys()),
+            (
+                "model_name",
+                "prompt",
+                "width",
+                "height",
+                "steps",
+                "seed",
+                "batch_size",
+                "negative_prompt",
+                "cfg",
+                "sampler_name",
+                "scheduler",
+                "shift",
+                "enable_turbo_mode",
+                "turbo_lora_name",
+                "turbo_strength",
+            ),
+        )
+        self.assertEqual(required["negative_prompt"][1]["default"], "")
+        self.assertEqual(required["cfg"][1]["default"], 4.0)
+        self.assertIn("euler", required["sampler_name"][0])
+        self.assertIn("simple", required["scheduler"][0])
+        self.assertEqual(required["shift"][1]["default"], 3.1)
+        self.assertEqual(required["enable_turbo_mode"][1]["default"], False)
+        self.assertEqual(optional["lora_stack"][0], QWEN_LORA_STACK_TYPE)
+
+    def test_qwen_edit_node_schema_exposes_advanced_inputs_optional_images_and_lora_stack(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSQwenImageEdit"]
+        required = node_cls.INPUT_TYPES()["required"]
+        optional = node_cls.INPUT_TYPES()["optional"]
+
+        self.assertEqual(node_cls.RETURN_TYPES, ("IMAGE",))
+        self.assertEqual(node_cls.RETURN_NAMES, ("image",))
+        self.assertEqual(
+            tuple(required.keys()),
+            (
+                "model_name",
+                "image",
+                "prompt",
+                "steps",
+                "seed",
+                "negative_prompt",
+                "cfg",
+                "sampler_name",
+                "scheduler",
+                "shift",
+                "cfg_norm_strength",
+                "reference_latents_method",
+                "enable_turbo_mode",
+                "turbo_lora_name",
+                "turbo_strength",
+            ),
+        )
+        self.assertEqual(optional["image2"][0], "IMAGE")
+        self.assertEqual(optional["image3"][0], "IMAGE")
+        self.assertEqual(optional["lora_stack"][0], QWEN_LORA_STACK_TYPE)
+        self.assertEqual(
+            required["reference_latents_method"][0],
+            ["offset", "index", "uxo/uno", "index_timestep_zero"],
+        )
+
+    def test_qwen_lora_stack_node_builds_ordered_stack(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSQwenLoRAStack"]
+        node = node_cls()
+
+        first = node.build("qwen-style-a.safetensors", 0.5)[0]
+        second = node.build("qwen-style-b.safetensors", 1.25, first)[0]
+
+        self.assertEqual(node_cls.RETURN_TYPES, (QWEN_LORA_STACK_TYPE,))
+        self.assertEqual(
+            second,
+            [
+                {"lora_name": "qwen-style-a.safetensors", "strength_model": 0.5},
+                {"lora_name": "qwen-style-b.safetensors", "strength_model": 1.25},
+            ],
+        )
+
+    def test_qwen_text_node_turbo_lora_choices_filter_only_text_loras(self):
         load_plugin_package()
         from lls_node_test_qwen.qwen import discovery as qwen_discovery
         from lls_node_test_qwen.qwen import nodes as qwen_nodes
 
-        stub = QwenFolderPathsStub()
-        stub._files["diffusion_models"] = ["flux1-dev.safetensors", "sdxl.safetensors"]
-        with mock.patch.object(qwen_discovery, "folder_paths", stub):
-            choices = qwen_nodes.LLSQwenTextToImage.INPUT_TYPES()["required"]["model_name"][0]
+        with mock.patch.object(qwen_discovery, "folder_paths", QwenFolderPathsStub()):
+            choices = qwen_nodes.LLSQwenTextToImage.INPUT_TYPES()["required"]["turbo_lora_name"][0]
 
-        self.assertEqual(choices, ["(no qwen text-to-image models found)"])
+        self.assertEqual(
+            choices,
+            [
+                "(auto)",
+                "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
+                "Qwen-Image-Lightning-8steps-V1.0.safetensors",
+            ],
+        )
+
+    def test_qwen_edit_node_turbo_lora_choices_filter_only_edit_loras(self):
+        load_plugin_package()
+        from lls_node_test_qwen.qwen import discovery as qwen_discovery
+        from lls_node_test_qwen.qwen import nodes as qwen_nodes
+
+        with mock.patch.object(qwen_discovery, "folder_paths", QwenFolderPathsStub()):
+            choices = qwen_nodes.LLSQwenImageEdit.INPUT_TYPES()["required"]["turbo_lora_name"][0]
+
+        self.assertEqual(
+            choices,
+            [
+                "(auto)",
+                "Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors",
+                "Qwen-Image-Edit-2511-Lightning-4steps-V1.0.safetensors",
+            ],
+        )
 
     def test_qwen_text_runtime_rejects_incompatible_model_name(self):
         load_plugin_package()
@@ -329,11 +475,20 @@ class TestQwenNodes(unittest.TestCase):
                 qwen_runtime.run_qwen_text_to_image(
                     model_name="qwen_image_edit_2511_bf16.safetensors",
                     prompt="a cat",
+                    negative_prompt="",
                     width=1024,
                     height=1024,
                     steps=20,
                     seed=1,
                     batch_size=1,
+                    cfg=4.0,
+                    sampler_name="euler",
+                    scheduler="simple",
+                    shift=3.1,
+                    enable_turbo_mode=False,
+                    turbo_lora_name="(auto)",
+                    turbo_strength=1.0,
+                    lora_stack=None,
                 )
 
     def test_qwen_edit_runtime_rejects_incompatible_model_name(self):
@@ -351,9 +506,22 @@ class TestQwenNodes(unittest.TestCase):
                 qwen_runtime.run_qwen_image_edit(
                     model_name="qwen_image_fp8_e4m3fn.safetensors",
                     image="IMAGE::input",
+                    image2=None,
+                    image3=None,
                     prompt="edit the cat",
+                    negative_prompt="",
                     steps=20,
                     seed=1,
+                    cfg=4.0,
+                    sampler_name="euler",
+                    scheduler="simple",
+                    shift=3.1,
+                    cfg_norm_strength=1.0,
+                    reference_latents_method="index_timestep_zero",
+                    enable_turbo_mode=False,
+                    turbo_lora_name="(auto)",
+                    turbo_strength=1.0,
+                    lora_stack=None,
                 )
 
     def test_qwen_text_runtime_raises_when_qwen_text_encoder_is_missing(self):
@@ -372,11 +540,20 @@ class TestQwenNodes(unittest.TestCase):
                 qwen_runtime.run_qwen_text_to_image(
                     model_name="qwen_image_fp8_e4m3fn.safetensors",
                     prompt="a cat",
+                    negative_prompt="",
                     width=1024,
                     height=1024,
                     steps=20,
                     seed=1,
                     batch_size=1,
+                    cfg=4.0,
+                    sampler_name="euler",
+                    scheduler="simple",
+                    shift=3.1,
+                    enable_turbo_mode=False,
+                    turbo_lora_name="(auto)",
+                    turbo_strength=1.0,
+                    lora_stack=None,
                 )
 
     def test_qwen_text_runtime_raises_when_qwen_vae_is_missing(self):
@@ -395,19 +572,32 @@ class TestQwenNodes(unittest.TestCase):
                 qwen_runtime.run_qwen_text_to_image(
                     model_name="qwen_image_fp8_e4m3fn.safetensors",
                     prompt="a cat",
+                    negative_prompt="",
                     width=1024,
                     height=1024,
                     steps=20,
                     seed=1,
                     batch_size=1,
+                    cfg=4.0,
+                    sampler_name="euler",
+                    scheduler="simple",
+                    shift=3.1,
+                    enable_turbo_mode=False,
+                    turbo_lora_name="(auto)",
+                    turbo_strength=1.0,
+                    lora_stack=None,
                 )
 
-    def test_qwen_text_runtime_executes_minimal_official_pipeline(self):
+    def test_qwen_text_runtime_passes_advanced_controls_and_ordered_user_loras(self):
         load_plugin_package()
         from lls_node_test_qwen.qwen import discovery as qwen_discovery
         from lls_node_test_qwen.qwen import runtime as qwen_runtime
 
         stub = QwenFolderPathsStub()
+        lora_stack = make_lora_stack(
+            ("qwen-style-a.safetensors", 0.5),
+            ("qwen-style-b.safetensors", 1.25),
+        )
         with mock.patch.object(qwen_discovery, "folder_paths", stub), mock.patch.object(
             qwen_runtime,
             "folder_paths",
@@ -420,24 +610,178 @@ class TestQwenNodes(unittest.TestCase):
             image = qwen_runtime.run_qwen_text_to_image(
                 model_name="qwen_image_fp8_e4m3fn.safetensors",
                 prompt="a cat",
+                negative_prompt="low quality",
                 width=1024,
                 height=1152,
-                steps=20,
+                steps=33,
                 seed=99,
                 batch_size=2,
+                cfg=7.5,
+                sampler_name="heun",
+                scheduler="normal",
+                shift=2.25,
+                enable_turbo_mode=False,
+                turbo_lora_name="(auto)",
+                turbo_strength=1.0,
+                lora_stack=lora_stack,
             )
 
-        self.assertEqual(image, "IMAGE::SAMPLED::99::20")
-        self.assertEqual(CoreQwenNodesStub.last_clip_call["type"], "qwen_image")
-        self.assertEqual(SD3NodesStub.last_generate_call, {"width": 1024, "height": 1152, "batch_size": 2})
-        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["cfg"], 4.0)
-        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["sampler_name"], "euler")
-        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["scheduler"], "simple")
+        self.assertEqual(image, "IMAGE::SAMPLED::99::33")
         self.assertEqual(CoreQwenNodesStub.last_text_encode_calls[0]["text"], "a cat")
-        self.assertEqual(CoreQwenNodesStub.last_text_encode_calls[1]["text"], "")
-        self.assertEqual(ModelAdvancedStub.last_call["shift"], 3.1)
+        self.assertEqual(CoreQwenNodesStub.last_text_encode_calls[1]["text"], "low quality")
+        self.assertEqual(SD3NodesStub.last_generate_call, {"width": 1024, "height": 1152, "batch_size": 2})
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["steps"], 33)
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["cfg"], 7.5)
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["sampler_name"], "heun")
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["scheduler"], "normal")
+        self.assertEqual(
+            [call["lora_name"] for call in CoreQwenNodesStub.last_lora_calls],
+            ["qwen-style-a.safetensors", "qwen-style-b.safetensors"],
+        )
+        self.assertEqual(ModelAdvancedStub.last_call["shift"], 2.25)
 
-    def test_qwen_edit_runtime_executes_minimal_official_pipeline(self):
+    def test_qwen_text_runtime_applies_user_loras_before_turbo_lora(self):
+        load_plugin_package()
+        from lls_node_test_qwen.qwen import discovery as qwen_discovery
+        from lls_node_test_qwen.qwen import runtime as qwen_runtime
+
+        stub = QwenFolderPathsStub()
+        lora_stack = make_lora_stack(("qwen-style-a.safetensors", 0.5))
+        with mock.patch.object(qwen_discovery, "folder_paths", stub), mock.patch.object(
+            qwen_runtime,
+            "folder_paths",
+            stub,
+        ), mock.patch.object(qwen_runtime, "comfy_core_nodes", CoreQwenNodesStub), mock.patch.object(
+            qwen_runtime,
+            "nodes_sd3",
+            SD3NodesStub,
+        ), mock.patch.object(qwen_runtime, "nodes_model_advanced", ModelAdvancedStub):
+            qwen_runtime.run_qwen_text_to_image(
+                model_name="qwen_image_fp8_e4m3fn.safetensors",
+                prompt="a cat",
+                negative_prompt="",
+                width=1024,
+                height=1024,
+                steps=50,
+                seed=99,
+                batch_size=1,
+                cfg=8.0,
+                sampler_name="euler",
+                scheduler="simple",
+                shift=3.1,
+                enable_turbo_mode=True,
+                turbo_lora_name="(auto)",
+                turbo_strength=0.75,
+                lora_stack=lora_stack,
+            )
+
+        self.assertEqual(
+            [call["lora_name"] for call in CoreQwenNodesStub.last_lora_calls],
+            [
+                "qwen-style-a.safetensors",
+                "Qwen-Image-Lightning-8steps-V1.0.safetensors",
+            ],
+        )
+        self.assertEqual(CoreQwenNodesStub.last_lora_calls[-1]["strength_model"], 0.75)
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["steps"], 8)
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["cfg"], 1.0)
+
+    def test_qwen_text_runtime_rejects_incompatible_manual_turbo_lora(self):
+        load_plugin_package()
+        from lls_node_test_qwen.qwen import discovery as qwen_discovery
+        from lls_node_test_qwen.qwen import runtime as qwen_runtime
+
+        stub = QwenFolderPathsStub()
+        with mock.patch.object(qwen_discovery, "folder_paths", stub), mock.patch.object(
+            qwen_runtime,
+            "folder_paths",
+            stub,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Turbo LoRA .* is not compatible"):
+                qwen_runtime.run_qwen_text_to_image(
+                    model_name="qwen_image_fp8_e4m3fn.safetensors",
+                    prompt="a cat",
+                    negative_prompt="",
+                    width=1024,
+                    height=1024,
+                    steps=20,
+                    seed=1,
+                    batch_size=1,
+                    cfg=4.0,
+                    sampler_name="euler",
+                    scheduler="simple",
+                    shift=3.1,
+                    enable_turbo_mode=True,
+                    turbo_lora_name="Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors",
+                    turbo_strength=1.0,
+                    lora_stack=None,
+                )
+
+    def test_qwen_edit_runtime_passes_optional_images_controls_and_ordered_user_loras(self):
+        load_plugin_package()
+        from lls_node_test_qwen.qwen import discovery as qwen_discovery
+        from lls_node_test_qwen.qwen import runtime as qwen_runtime
+
+        stub = QwenFolderPathsStub()
+        lora_stack = make_lora_stack(
+            ("qwen-style-a.safetensors", 0.5),
+            ("qwen-style-b.safetensors", 1.25),
+        )
+        with mock.patch.object(qwen_discovery, "folder_paths", stub), mock.patch.object(
+            qwen_runtime,
+            "folder_paths",
+            stub,
+        ), mock.patch.object(qwen_runtime, "comfy_core_nodes", CoreQwenNodesStub), mock.patch.object(
+            qwen_runtime,
+            "nodes_model_advanced",
+            ModelAdvancedStub,
+        ), mock.patch.object(qwen_runtime, "nodes_qwen", QwenExtraNodesStub), mock.patch.object(
+            qwen_runtime,
+            "nodes_flux",
+            FluxNodesStub,
+        ), mock.patch.object(qwen_runtime, "nodes_cfg", CFGNodesStub):
+            image = qwen_runtime.run_qwen_image_edit(
+                model_name="qwen_image_edit_2509_fp8_e4m3fn.safetensors",
+                image="IMAGE::input",
+                image2="IMAGE::ref2",
+                image3="IMAGE::ref3",
+                prompt="turn the cat blue",
+                negative_prompt="low quality",
+                steps=28,
+                seed=123,
+                cfg=6.5,
+                sampler_name="heun",
+                scheduler="normal",
+                shift=2.0,
+                cfg_norm_strength=0.8,
+                reference_latents_method="index",
+                enable_turbo_mode=False,
+                turbo_lora_name="(auto)",
+                turbo_strength=1.0,
+                lora_stack=lora_stack,
+            )
+
+        self.assertEqual(image, "IMAGE::SAMPLED::123::28")
+        self.assertEqual(FluxNodesStub.last_scale_call, {"image": "IMAGE::input"})
+        self.assertEqual(QwenExtraNodesStub.last_calls[0]["prompt"], "turn the cat blue")
+        self.assertEqual(QwenExtraNodesStub.last_calls[0]["image1"], "SCALED::IMAGE::input")
+        self.assertEqual(QwenExtraNodesStub.last_calls[0]["image2"], "IMAGE::ref2")
+        self.assertEqual(QwenExtraNodesStub.last_calls[0]["image3"], "IMAGE::ref3")
+        self.assertEqual(QwenExtraNodesStub.last_calls[1]["prompt"], "low quality")
+        self.assertEqual(len(FluxNodesStub.last_reference_calls), 2)
+        self.assertEqual(FluxNodesStub.last_reference_calls[0]["reference_latents_method"], "index")
+        self.assertEqual(CFGNodesStub.last_call["strength"], 0.8)
+        self.assertEqual(CoreQwenNodesStub.last_vae_encode_call["pixels"], "SCALED::IMAGE::input")
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["cfg"], 6.5)
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["sampler_name"], "heun")
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["scheduler"], "normal")
+        self.assertEqual(
+            [call["lora_name"] for call in CoreQwenNodesStub.last_lora_calls],
+            ["qwen-style-a.safetensors", "qwen-style-b.safetensors"],
+        )
+        self.assertEqual(ModelAdvancedStub.last_call["shift"], 2.0)
+
+    def test_qwen_edit_runtime_supports_2511_turbo_when_matching_lora_exists(self):
         load_plugin_package()
         from lls_node_test_qwen.qwen import discovery as qwen_discovery
         from lls_node_test_qwen.qwen import runtime as qwen_runtime
@@ -456,52 +800,43 @@ class TestQwenNodes(unittest.TestCase):
             "nodes_flux",
             FluxNodesStub,
         ), mock.patch.object(qwen_runtime, "nodes_cfg", CFGNodesStub):
-            image = qwen_runtime.run_qwen_image_edit(
+            qwen_runtime.run_qwen_image_edit(
                 model_name="qwen_image_edit_2511_bf16.safetensors",
                 image="IMAGE::input",
+                image2=None,
+                image3=None,
                 prompt="turn the cat blue",
-                steps=30,
+                negative_prompt="",
+                steps=20,
                 seed=123,
+                cfg=4.0,
+                sampler_name="euler",
+                scheduler="simple",
+                shift=3.1,
+                cfg_norm_strength=1.0,
+                reference_latents_method="index_timestep_zero",
+                enable_turbo_mode=True,
+                turbo_lora_name="(auto)",
+                turbo_strength=0.7,
+                lora_stack=None,
             )
 
-        self.assertEqual(image, "IMAGE::SAMPLED::123::30")
-        self.assertEqual(FluxNodesStub.last_scale_call, {"image": "IMAGE::input"})
-        self.assertEqual(QwenExtraNodesStub.last_calls[0]["prompt"], "turn the cat blue")
-        self.assertEqual(QwenExtraNodesStub.last_calls[0]["image1"], "SCALED::IMAGE::input")
-        self.assertEqual(QwenExtraNodesStub.last_calls[1]["prompt"], "")
-        self.assertEqual(len(FluxNodesStub.last_reference_calls), 2)
-        self.assertEqual(FluxNodesStub.last_reference_calls[0]["reference_latents_method"], "index_timestep_zero")
-        self.assertEqual(CFGNodesStub.last_call["strength"], 1.0)
-        self.assertEqual(CoreQwenNodesStub.last_vae_encode_call["pixels"], "SCALED::IMAGE::input")
-        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["cfg"], 4.0)
-
-    def test_qwen_text_node_returns_image_only(self):
-        plugin = load_plugin_package()
-        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSQwenTextToImage"]
-        required = node_cls.INPUT_TYPES()["required"]
-
-        self.assertEqual(node_cls.RETURN_TYPES, ("IMAGE",))
-        self.assertEqual(node_cls.RETURN_NAMES, ("image",))
         self.assertEqual(
-            tuple(required.keys()),
-            ("model_name", "prompt", "width", "height", "steps", "seed", "batch_size"),
+            CoreQwenNodesStub.last_lora_calls[-1]["lora_name"],
+            "Qwen-Image-Edit-2511-Lightning-4steps-V1.0.safetensors",
         )
-
-    def test_qwen_edit_node_returns_image_only(self):
-        plugin = load_plugin_package()
-        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSQwenImageEdit"]
-        required = node_cls.INPUT_TYPES()["required"]
-
-        self.assertEqual(node_cls.RETURN_TYPES, ("IMAGE",))
-        self.assertEqual(node_cls.RETURN_NAMES, ("image",))
-        self.assertEqual(tuple(required.keys()), ("model_name", "image", "prompt", "steps", "seed"))
+        self.assertEqual(CoreQwenNodesStub.last_lora_calls[-1]["strength_model"], 0.7)
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["steps"], 4)
+        self.assertEqual(CoreQwenNodesStub.last_ksampler_call["cfg"], 1.0)
 
     def test_qwen_text_node_executes_runtime(self):
         load_plugin_package()
         from lls_node_test_qwen.qwen import nodes as qwen_nodes
-        node = qwen_nodes.LLSQwenTextToImage()
 
-        with mock.patch.object(qwen_nodes.runtime, "run_qwen_text_to_image", return_value="IMAGE::node"):
+        node = qwen_nodes.LLSQwenTextToImage()
+        lora_stack = make_lora_stack(("qwen-style-a.safetensors", 0.5))
+
+        with mock.patch.object(qwen_nodes.runtime, "run_qwen_text_to_image", return_value="IMAGE::node") as runtime_mock:
             result = node.generate(
                 model_name="qwen_image_fp8_e4m3fn.safetensors",
                 prompt="a cat",
@@ -510,25 +845,51 @@ class TestQwenNodes(unittest.TestCase):
                 steps=20,
                 seed=1,
                 batch_size=1,
+                negative_prompt="",
+                cfg=4.0,
+                sampler_name="euler",
+                scheduler="simple",
+                shift=3.1,
+                enable_turbo_mode=False,
+                turbo_lora_name="(auto)",
+                turbo_strength=1.0,
+                lora_stack=lora_stack,
             )
 
         self.assertEqual(result, ("IMAGE::node",))
+        self.assertEqual(runtime_mock.call_args.kwargs["lora_stack"], lora_stack)
 
     def test_qwen_edit_node_executes_runtime(self):
         load_plugin_package()
         from lls_node_test_qwen.qwen import nodes as qwen_nodes
-        node = qwen_nodes.LLSQwenImageEdit()
 
-        with mock.patch.object(qwen_nodes.runtime, "run_qwen_image_edit", return_value="IMAGE::node-edit"):
+        node = qwen_nodes.LLSQwenImageEdit()
+        lora_stack = make_lora_stack(("qwen-style-a.safetensors", 0.5))
+
+        with mock.patch.object(qwen_nodes.runtime, "run_qwen_image_edit", return_value="IMAGE::node-edit") as runtime_mock:
             result = node.generate(
                 model_name="qwen_image_edit_2511_bf16.safetensors",
                 image="IMAGE::input",
                 prompt="edit the cat",
                 steps=20,
                 seed=1,
+                image2=None,
+                image3=None,
+                negative_prompt="",
+                cfg=4.0,
+                sampler_name="euler",
+                scheduler="simple",
+                shift=3.1,
+                cfg_norm_strength=1.0,
+                reference_latents_method="index_timestep_zero",
+                enable_turbo_mode=False,
+                turbo_lora_name="(auto)",
+                turbo_strength=1.0,
+                lora_stack=lora_stack,
             )
 
         self.assertEqual(result, ("IMAGE::node-edit",))
+        self.assertEqual(runtime_mock.call_args.kwargs["lora_stack"], lora_stack)
 
 
 if __name__ == "__main__":

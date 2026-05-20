@@ -38,6 +38,8 @@ Extend the existing Qwen nodes so they expose official/common advanced parameter
 - Add advanced prompt/sampling controls to `LLSQwenTextToImage`
 - Add advanced prompt/sampling/edit controls to `LLSQwenImageEdit`
 - Add optional `image2` and `image3` to the image-edit node
+- Add optional ordered user LoRA stack input to both Qwen nodes
+- Add one compact helper node for building an ordered Qwen LoRA stack
 - Add optional turbo/lightning LoRA mode to both nodes
 - Auto-match compatible turbo LoRAs when requested
 - Reject incompatible turbo LoRA selections explicitly
@@ -62,6 +64,7 @@ This keeps the current user experience intact:
 
 - users still drag one node for text-to-image
 - users still drag one node for image edit
+- users can optionally connect one compact ordered LoRA stack input
 - advanced users gain the controls they expect
 - the plugin still avoids forcing Qwen through the generic SD/SDXL/FLUX abstractions
 
@@ -86,6 +89,7 @@ This keeps the current user experience intact:
 - `sampler_name`
 - `scheduler`
 - `shift`
+- `lora_stack` (optional input)
 - `enable_turbo_mode`
 - `turbo_lora_name`
 - `turbo_strength`
@@ -103,6 +107,7 @@ This keeps the current user experience intact:
 - Passes `cfg`, `sampler_name`, and `scheduler` directly into internal sampling
 - Passes `shift` directly into `ModelSamplingAuraFlow`
 - Creates the latent internally from `width`, `height`, and `batch_size`
+- Applies any connected ordered user LoRA stack to the internal model before turbo handling
 - Optionally loads a compatible turbo/lightning LoRA when turbo mode is enabled
 - Returns only the final decoded `IMAGE`
 
@@ -127,6 +132,7 @@ This keeps the current user experience intact:
 - `shift`
 - `cfg_norm_strength`
 - `reference_latents_method`
+- `lora_stack` (optional input)
 - `enable_turbo_mode`
 - `turbo_lora_name`
 - `turbo_strength`
@@ -148,8 +154,31 @@ This keeps the current user experience intact:
 - Passes `shift` into `ModelSamplingAuraFlow`
 - Passes `cfg_norm_strength` into `CFGNorm`
 - Passes `reference_latents_method` into `FluxKontextMultiReferenceLatentMethod`
+- Applies any connected ordered user LoRA stack to the internal model before turbo handling
 - Optionally loads a compatible turbo/lightning LoRA when turbo mode is enabled
 - Returns only the final decoded `IMAGE`
+
+### `LLSQwenLoRAStack`
+
+**Base Inputs**
+
+- `lora_name`
+- `strength_model`
+
+**Optional Input**
+
+- `lora_stack`
+
+**Output**
+
+- `LLS_QWEN_LORA_STACK`
+
+**Behavior**
+
+- Builds an ordered model-only LoRA stack for the Qwen nodes
+- Supports serial chaining by accepting an existing `lora_stack` and appending one more LoRA entry
+- Preserves user-specified order exactly
+- Keeps the main Qwen nodes compressed by moving multi-LoRA assembly into one small helper node
 
 ## Advanced Parameter Defaults
 
@@ -209,10 +238,28 @@ When `enable_turbo_mode = true`:
 - find a compatible turbo/lightning LoRA for the selected main model
 - if `turbo_lora_name = "(auto)"`, auto-select the matching LoRA
 - if `turbo_lora_name` is manually set, validate it against the selected main model
+- keep user LoRA stack application order separate from turbo handling
 - apply that LoRA to the internal model only
 - use `turbo_strength` as the LoRA strength
 - override runtime `steps` and `cfg` with turbo presets
 - keep `sampler_name`, `scheduler`, and `shift` user-controlled
+
+### Ordered LoRA Rules
+
+When a `lora_stack` input is connected:
+
+- treat it as an ordered serial chain
+- apply entries in the exact order they appear in the stack
+- use `LoraLoaderModelOnly` semantics because these Qwen nodes keep `clip` hidden
+- apply the full user stack before optional turbo/lightning LoRA application
+
+This yields the internal order:
+
+- base Qwen model
+- user LoRA #1
+- user LoRA #2
+- ...
+- optional turbo/lightning LoRA
 
 ### Compatibility Strategy
 
@@ -226,7 +273,7 @@ When `enable_turbo_mode = true`:
 
 - Accept only Qwen image-edit turbo/lightning LoRAs
 - `qwen_image_edit_2509_*` models prefer `Qwen-Image-Edit-2509-Lightning-*`
-- `qwen_image_edit_2511_*` currently has no assumed compatible turbo LoRA
+- `qwen_image_edit_2511_*` models may use `Qwen-Image-Edit-2511-Lightning-*` when that LoRA is present locally
 
 ### Turbo Presets
 
@@ -235,6 +282,7 @@ When turbo mode is enabled, the runtime should replace user-entered `steps` and 
 - `qwen_image_fp8_e4m3fn.safetensors` -> `steps = 8`, `cfg = 1.0`
 - `qwen_image_2512_fp8_e4m3fn.safetensors` -> `steps = 4`, `cfg = 1.0`
 - `qwen_image_edit_2509_fp8_e4m3fn.safetensors` -> `steps = 4`, `cfg = 1.0`
+- `qwen_image_edit_2511_*` -> `steps = 4`, `cfg = 1.0`
 
 If the selected model has no supported turbo profile, turbo mode must fail with a clear error.
 
@@ -310,6 +358,7 @@ Required error cases:
 - required Qwen text encoder is missing
 - required Qwen VAE is missing
 - primary edit image is missing
+- the connected user LoRA stack is malformed
 - required ComfyUI runtime component is unavailable
 - turbo mode is enabled but no compatible turbo LoRA exists
 - turbo mode is enabled but the selected model has no supported turbo preset
@@ -331,6 +380,7 @@ Extend the existing `qwen/` package instead of creating a second feature family.
 Add helpers for:
 
 - discovering compatible turbo/lightning LoRAs
+- listing user-selectable LoRAs for Qwen stack building
 - resolving `(auto)` turbo LoRA matches
 - validating manual turbo LoRA selections
 - exposing placeholder choices when no compatible turbo LoRAs exist
@@ -340,6 +390,7 @@ Add helpers for:
 Extend runtime wrappers so they accept advanced parameters and:
 
 - pass prompt/sampler controls through to internal Qwen execution
+- apply ordered model-only user LoRA stacks
 - load optional turbo LoRAs
 - apply turbo presets when enabled
 - support multi-image edit conditioning
@@ -353,12 +404,16 @@ Expand both node schemas to expose the agreed advanced inputs while preserving:
 - internal resource encapsulation
 - separate text-to-image and image-edit nodes
 
+Also add one compact helper node that outputs `LLS_QWEN_LORA_STACK`.
+
 ## Testing
 
 Add or update tests for:
 
 - text-to-image schema includes the new advanced inputs
 - image-edit schema includes the new advanced inputs
+- LoRA stack helper schema exposes serial chaining
+- ordered user LoRA stack entries are applied in order
 - negative prompt is routed into the negative conditioning path
 - `cfg`, `sampler_name`, `scheduler`, and `shift` are passed through correctly
 - `image2` and `image3` are routed into edit conditioning
@@ -388,6 +443,7 @@ This iteration is successful when:
 
 - `LLSQwenTextToImage` exposes official/common advanced prompt and sampling controls
 - `LLSQwenImageEdit` exposes official/common advanced prompt, sampling, and edit controls
+- both nodes accept an optional ordered model-side LoRA stack input
 - both nodes still hide model/clip/vae wiring
 - both nodes still output only `IMAGE`
 - text-to-image turbo mode works for supported Qwen text models
