@@ -41,7 +41,7 @@ def normalize_model_info(model_info: dict[str, Any] | str | None) -> dict[str, A
     return {
         "model_family": _normalize_model_family(raw_family),
         "model_role": str(raw.get("model_role") or raw.get("role") or "unknown"),
-        "supports_inpaint_native": bool(raw.get("supports_inpaint_native", False)),
+        "supports_inpaint_native": _coerce_bool(raw.get("supports_inpaint_native"), False),
     }
 
 
@@ -61,12 +61,13 @@ def normalize_repair_info(repair_info: dict[str, Any] | str | None) -> dict[str,
     info["mask_grow"] = _coerce_int(info.get("mask_grow"), 8)
     info["mask_blur"] = _coerce_float(info.get("mask_blur"), 8.0)
     info["mask_threshold"] = _coerce_float(info.get("mask_threshold"), 0.5)
-    info["invert_mask"] = bool(info.get("invert_mask", False))
+    info["invert_mask"] = _coerce_bool(info.get("invert_mask"), False)
     info["recommended_denoise"] = _coerce_float(info.get("recommended_denoise"), 0.55)
     info["model_family"] = _normalize_model_family(info.get("model_family") or model_info["model_family"])
     info["model_role"] = str(info.get("model_role") or model_info["model_role"])
-    info["supports_inpaint_native"] = bool(
-        info.get("supports_inpaint_native", model_info["supports_inpaint_native"])
+    info["supports_inpaint_native"] = _coerce_bool(
+        info.get("supports_inpaint_native", model_info["supports_inpaint_native"]),
+        model_info["supports_inpaint_native"],
     )
     info["repair_payload_version"] = str(info.get("repair_payload_version") or "1.0")
     info["warnings"] = _normalize_warning_list(info.get("warnings"))
@@ -278,6 +279,25 @@ def _coerce_float(value: Any, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _coerce_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"", "none"}:
+            return default
+        if lowered in {"true", "1", "yes", "on"}:
+            return True
+        if lowered in {"false", "0", "no", "off"}:
+            return False
+        return default
+    return bool(value)
 
 
 def _normalize_box(value: Any) -> tuple[int, int, int, int] | None:

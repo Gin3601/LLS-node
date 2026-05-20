@@ -32,6 +32,22 @@ class TestRepairUtils(unittest.TestCase):
         model_info = utils.normalize_model_info({"model_family": "SD15"})
         self.assertEqual(model_info["model_family"], "SD1.5")
 
+    def test_normalize_model_info_coerces_string_booleans(self):
+        utils = load_repair_utils()
+
+        self.assertFalse(
+            utils.normalize_model_info({"supports_inpaint_native": "false"})["supports_inpaint_native"]
+        )
+        self.assertFalse(
+            utils.normalize_model_info({"supports_inpaint_native": "0"})["supports_inpaint_native"]
+        )
+        self.assertTrue(
+            utils.normalize_model_info({"supports_inpaint_native": "true"})["supports_inpaint_native"]
+        )
+        self.assertTrue(
+            utils.normalize_model_info({"supports_inpaint_native": 1})["supports_inpaint_native"]
+        )
+
     def test_canonicalized_family_feeds_sd_classic_adapter_resolution(self):
         utils = load_repair_utils()
 
@@ -106,6 +122,22 @@ class TestRepairUtils(unittest.TestCase):
             "vae_inpaint",
         )
 
+    def test_resolve_repair_kernel_downgrades_explicit_native_fill_when_unsupported(self):
+        utils = load_repair_utils()
+
+        kernel, warnings = utils.resolve_repair_kernel(
+            "native_fill",
+            scope="region",
+            task_hint="repair",
+            mask_area_ratio=0.05,
+            model_info={"supports_inpaint_native": "false"},
+        )
+        self.assertEqual(kernel, "vae_inpaint")
+        self.assertEqual(
+            warnings,
+            ["native_fill requested but unsupported; falling back to vae_inpaint"],
+        )
+
     def test_recommend_denoise_applies_required_rules(self):
         utils = load_repair_utils()
 
@@ -175,6 +207,14 @@ class TestRepairUtils(unittest.TestCase):
 
         info = utils.normalize_repair_info({"model_family": "SD15", "repair_scope": "region"})
         self.assertEqual(info["model_family"], "SD1.5")
+
+    def test_normalize_repair_info_coerces_string_boolean_invert_mask(self):
+        utils = load_repair_utils()
+
+        self.assertFalse(utils.normalize_repair_info({"invert_mask": "false"})["invert_mask"])
+        self.assertFalse(utils.normalize_repair_info({"invert_mask": "0"})["invert_mask"])
+        self.assertTrue(utils.normalize_repair_info({"invert_mask": "true"})["invert_mask"])
+        self.assertTrue(utils.normalize_repair_info({"invert_mask": 1})["invert_mask"])
 
 
 if __name__ == "__main__":
