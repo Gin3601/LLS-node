@@ -35,18 +35,14 @@ else:
     _CORE_NODES_ERR = None
 
 from ..utils.model_info import (
-    LLS_TEXT_ENCODER_TYPE,
     MODEL_FAMILY_CHOICES,
-    build_model_info,
     canonicalize_family,
-    family_requires_guidance,
     get_family_defaults,
-    get_latent_spec,
     infer_family_from_name,
     is_flux_family,
     is_sdxl_family,
+    tag_lls_object,
 )
-from ..utils.task_context import LLS_TASK_CONTEXT_TYPE, merge_task_context, parse_task_context, update_task_context
 
 
 AUTO_PLACEHOLDER = "(auto)"
@@ -355,20 +351,21 @@ class LLSSimpleCheckpointLoader:
     """
     统一封装的基础模型加载器。
 
-    兼容输出结构为 model / clip / vae / task_context / text_encoder。
+    输出结构固定为 model / clip / vae / text_encoder。
     - `clip` 保留旧工作流需要的原生 CLIP 端口类型和位置。
-    - `text_encoder` 为新接口别名，内部承载同一个 ComfyUI 文本编码对象。
+    - `text_encoder` 是同一个原生 CLIP 对象的兼容别名。
+    - 轻量级模型信息写入原生对象 `_lls_*` 属性，不再额外输出 task_context。
     """
 
     CATEGORY = "LLS/Model Loader"
     FUNCTION = "load_checkpoint"
-    RETURN_TYPES = ("MODEL", "CLIP", "VAE", LLS_TASK_CONTEXT_TYPE, LLS_TEXT_ENCODER_TYPE)
-    RETURN_NAMES = ("model", "clip", "vae", "task_context", "text_encoder")
+    RETURN_TYPES = ("MODEL", "CLIP", "VAE", "CLIP")
+    RETURN_NAMES = ("model", "clip", "vae", "text_encoder")
     DESCRIPTION = (
         "Load SD1.5, SDXL, SDXL Turbo, and FLUX families with family-aware resource dispatch. "
         "Supports FLUX checkpoint-all-in-one mode and separated diffusion/text-encoder/VAE mode. "
-        "Preserves the legacy CLIP output for old workflows and writes the resolved loader state "
-        "back into a unified task_context object."
+        "Preserves the legacy CLIP output for old workflows and writes lightweight metadata "
+        "into native MODEL/CLIP/VAE objects."
     )
 
     @classmethod
@@ -384,9 +381,6 @@ class LLSSimpleCheckpointLoader:
                 "external_text_encoder_1": (_get_text_encoder_choices(), {"default": AUTO_PLACEHOLDER}),
                 "external_text_encoder_2": (_get_text_encoder_choices(), {"default": AUTO_PLACEHOLDER}),
             },
-            "optional": {
-                "task_context": (LLS_TASK_CONTEXT_TYPE,),
-            },
         }
 
     def load_checkpoint(
@@ -399,7 +393,6 @@ class LLSSimpleCheckpointLoader:
         external_vae_name: str,
         external_text_encoder_1: str,
         external_text_encoder_2: str,
-        task_context=None,
     ):
         if folder_paths is None:
             raise RuntimeError(
@@ -410,20 +403,10 @@ class LLSSimpleCheckpointLoader:
                 "[LLS] comfy.sd is not available. Make sure this node runs inside ComfyUI."
             ) from _COMFY_SD_ERR
 
-        context = parse_task_context(task_context)
-        requested_family = str(context.get("model_family") or "auto")
-        if model_family != "Auto":
-            requested_family = model_family
         if model_family == "Auto":
-            fallback_family = context.get("resolved_model_family") or context.get("family") or context.get("model_family") or "SD1.5"
-            family = infer_family_from_name(ckpt_name, fallback_family)
+            family = infer_family_from_name(ckpt_name, "SD1.5")
         else:
-            family = canonicalize_family(requested_family)
-
-        if vae_source == "auto" and context.get("use_external_vae"):
-            vae_source = "external"
-        if text_encoder_source == "auto" and context.get("use_external_text_encoder"):
-            text_encoder_source = "external"
+            family = canonicalize_family(model_family)
 
         model_source, model_path = _resolve_model_path(ckpt_name, family)
         model, embedded_text_encoder, embedded_vae = _load_model(model_source, model_path)
@@ -449,79 +432,41 @@ class LLSSimpleCheckpointLoader:
         )
 
         defaults = get_family_defaults(family)
-        latent_spec = get_latent_spec(defaults)
-        model_info = build_model_info(
+        resolved_text_encoder_name = resolved_te_1 or ("embedded" if text_encoder is not None else None)
+        resolved_text_encoder_name_1 = resolved_te_1 or ("embedded" if text_encoder is not None and not resolved_te_2 else None)
+        resolved_text_encoder_name_2 = resolved_te_2
+        if resolved_te_1 and resolved_te_2:
+            resolved_text_encoder_name = ", ".join([resolved_te_1, resolved_te_2])
+        resolved_vae_label = resolved_vae_name or ("embedded" if vae is not None else None)
+
+        tag_lls_object(
+            model,
             family=family,
-            checkpoint_name=ckpt_name,
             model_name=ckpt_name,
+            checkpoint_name=ckpt_name,
             load_mode=load_mode,
-            vae_source=resolved_vae_source,
-            text_encoder_source=resolved_text_encoder_source,
+        )
+        tag_lls_object(
+            text_encoder,
+            family=family,
+            model_name=ckpt_name,
+            checkpoint_name=ckpt_name,
             text_encoder_type=defaults["text_encoder_type"],
-            has_embedded_vae=embedded_vae is not None,
-            has_embedded_text_encoder=embedded_text_encoder is not None,
-            required_text_encoders=defaults["required_text_encoders"],
-            required_vae=defaults["required_vae"],
-            is_turbo=defaults["is_turbo"],
-            is_flux=defaults["is_flux"],
-            default_width=defaults["default_width"],
-            default_height=defaults["default_height"],
-            default_steps=defaults["default_steps"],
-            default_cfg=defaults["default_cfg"],
-            default_guidance=defaults["default_guidance"],
-            default_sampler=defaults["default_sampler"],
-            default_scheduler=defaults["default_scheduler"],
-            default_denoise=defaults["default_denoise"],
-            guidance_embed=family_requires_guidance(family),
-            latent_channels=latent_spec["latent_channels"],
-            downscale_ratio=latent_spec["downscale_ratio"],
-            model_source=model_source,
-            vae_name=resolved_vae_name or ("embedded" if embedded_vae is not None else None),
-            text_encoder_name=resolved_te_1,
-            text_encoder_name_1=resolved_te_1,
-            text_encoder_name_2=resolved_te_2,
-        )
-
-        model_caps = {
-            "supports_img2img": vae is not None,
-            "supports_inpaint": vae is not None,
-            "supports_controlnet": family in {"SD1.5", "SDXL", "SDXL_TURBO"},
-            "supports_clip_skip": not is_flux_family(family),
-            "supports_flux_guidance": is_flux_family(family),
-            "vae_type": "ae" if is_flux_family(family) else "vae",
-            "text_encoder_type": model_info["text_encoder_type"],
-            "latent_channels": latent_spec["latent_channels"],
-            "downscale_ratio": latent_spec["downscale_ratio"],
-            "recommended_width": model_info["default_width"],
-            "recommended_height": model_info["default_height"],
-            "recommended_steps": model_info["default_steps"],
-            "recommended_cfg": model_info["default_cfg"],
-            "recommended_denoise": model_info["default_denoise"],
-            "recommended_guidance": model_info["default_guidance"],
-            "recommended_sampler": model_info["default_sampler"],
-            "recommended_scheduler": model_info["default_scheduler"],
-            "source": "LLS Simple Checkpoint Loader",
-        }
-        next_context = merge_task_context(context, model_info)
-        next_context = update_task_context(
-            next_context,
-            model_family=requested_family,
-            resolved_model_family=family,
-            checkpoint_name=ckpt_name,
-            model_name=ckpt_name,
-            load_mode=load_mode,
-            vae_source=resolved_vae_source,
             text_encoder_source=resolved_text_encoder_source,
-            vae_name=resolved_vae_name or ("embedded" if embedded_vae is not None else None),
-            text_encoder_name=resolved_te_1,
-            text_encoder_name_1=resolved_te_1,
-            text_encoder_name_2=resolved_te_2,
-            use_external_vae=resolved_vae_source == "external",
-            use_external_text_encoder=resolved_text_encoder_source == "external",
-            **model_caps,
+            text_encoder_name=resolved_text_encoder_name,
+            text_encoder_name_1=resolved_text_encoder_name_1,
+            text_encoder_name_2=resolved_text_encoder_name_2,
+        )
+        tag_lls_object(
+            vae,
+            family=family,
+            model_name=ckpt_name,
+            checkpoint_name=ckpt_name,
+            vae_name=resolved_vae_label,
+            vae_source=resolved_vae_source,
         )
 
-        return (model, text_encoder, vae, next_context, text_encoder)
+        return (model, text_encoder, vae, text_encoder)
 
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {

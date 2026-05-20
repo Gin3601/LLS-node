@@ -369,6 +369,9 @@ def get_sampling_preset(model_info: dict[str, Any] | str | None, quality_preset:
 
 def infer_family_from_clip(clip) -> str:
     """从 CLIP 对象的 tokenizer 结构自动推断模型家族。"""
+    lls_family = getattr(clip, "_lls_family", None)
+    if lls_family and lls_family not in ("auto", "Auto", ""):
+        return canonicalize_family(lls_family)
     try:
         tokens = clip.tokenize("")
     except Exception:
@@ -411,3 +414,83 @@ def infer_task_mode_from_latent(latent: dict) -> str:
         if source == "image_encode":
             return "img2img"
     return "txt2img"
+
+
+def tag_lls_object(obj, **kwargs: Any):
+    """为原生 ComfyUI 对象附加轻量级 `_lls_*` 元信息。"""
+    if obj is None:
+        return obj
+    for key, value in kwargs.items():
+        if value is None:
+            continue
+        attr_name = key if key.startswith("_lls_") else f"_lls_{key}"
+        try:
+            setattr(obj, attr_name, value)
+        except Exception:
+            continue
+    return obj
+
+
+def get_lls_attr(obj, name: str, default: Any = None) -> Any:
+    if obj is None:
+        return default
+    attr_name = name if name.startswith("_lls_") else f"_lls_{name}"
+    return getattr(obj, attr_name, default)
+
+
+def resolve_model_family(
+    model_family: str | None = None,
+    *,
+    model=None,
+    clip=None,
+    fallback: str = "SD1.5",
+) -> str:
+    normalized = str(model_family or "").strip()
+    if normalized and normalized not in {"Auto", "auto"}:
+        return canonicalize_family(normalized)
+
+    if model is not None:
+        inferred_from_model = infer_family_from_model(model)
+        if inferred_from_model:
+            return canonicalize_family(inferred_from_model)
+
+    if clip is not None:
+        inferred_from_clip = infer_family_from_clip(clip)
+        if inferred_from_clip:
+            return canonicalize_family(inferred_from_clip)
+
+    return canonicalize_family(fallback)
+
+
+def resolve_model_name(model=None, clip=None, fallback: str = "") -> str:
+    return str(
+        get_lls_attr(model, "model_name")
+        or get_lls_attr(clip, "model_name")
+        or fallback
+        or ""
+    )
+
+
+def resolve_vae_name(vae=None, fallback: str = "") -> str:
+    return str(get_lls_attr(vae, "vae_name") or fallback or "")
+
+
+def resolve_text_encoder_names(clip=None) -> dict[str, str]:
+    name = get_lls_attr(clip, "text_encoder_name") or ""
+    name_1 = get_lls_attr(clip, "text_encoder_name_1") or ""
+    name_2 = get_lls_attr(clip, "text_encoder_name_2") or ""
+
+    if not name and name_1 and name_2:
+        name = ", ".join(part for part in (name_1, name_2) if part)
+    elif not name:
+        name = name_1 or name_2 or ""
+
+    return {
+        "text_encoder_name": str(name),
+        "text_encoder_name_1": str(name_1),
+        "text_encoder_name_2": str(name_2),
+    }
+
+
+def build_info_payload(**kwargs: Any) -> dict[str, Any]:
+    return {key: value for key, value in kwargs.items() if value is not None}

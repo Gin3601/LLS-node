@@ -34,13 +34,13 @@ from __future__ import annotations
 
 from .model_info import (
     FAMILY_DEFAULT_PRESET,
+    MODEL_FAMILY_CHOICES,
     SIZE_PRESET_AUTO,
     get_family_defaults,
     get_sampling_preset,
     info_to_json,
-    parse_model_info,
+    resolve_model_family,
 )
-from .task_context import LLS_TASK_CONTEXT_TYPE, parse_task_context
 
 
 # ---------- 节点类示例（基础类型，纯 Python 无外部依赖） ----------
@@ -168,20 +168,20 @@ class LLSGenerationConfig:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
                 "quality_preset": (cls._QUALITY_PRESETS, {"default": FAMILY_DEFAULT_PRESET}),
                 "size_preset": (cls._SIZE_PRESETS, {"default": SIZE_PRESET_AUTO}),
             },
             "optional": {
-                "task_context": (LLS_TASK_CONTEXT_TYPE,),
-                "model_info": (LLS_TASK_CONTEXT_TYPE,),
+                "model": ("MODEL",),
+                "clip": ("CLIP",),
             },
         }
 
-    def execute(self, quality_preset: str, size_preset: str, task_context=None, model_info=None):
-        context = parse_task_context(task_context or model_info)
-        info = parse_model_info(context)
-        defaults = get_family_defaults(info["family"])
-        preset = get_sampling_preset(info, quality_preset) or {
+    def execute(self, model_family: str, quality_preset: str, size_preset: str, model=None, clip=None):
+        family = resolve_model_family(model_family, model=model, clip=clip)
+        defaults = get_family_defaults(family)
+        preset = get_sampling_preset(defaults, quality_preset) or {
             "steps": defaults["default_steps"],
             "cfg": defaults["default_cfg"],
             "guidance": defaults["default_guidance"],
@@ -203,7 +203,7 @@ class LLSGenerationConfig:
         guidance = 0.0 if guidance is None else float(guidance)
         config_info = info_to_json(
             {
-                "family": context.get("resolved_model_family") or info["family"],
+                "family": family,
                 "width": width,
                 "height": height,
                 "steps": int(preset["steps"]),

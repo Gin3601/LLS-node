@@ -21,11 +21,13 @@ except Exception:
     model_management = None
 
 from ..utils.model_info import (
+    MODEL_FAMILY_CHOICES,
     SIZE_PRESET_AUTO,
+    get_family_defaults,
     get_latent_spec,
-    parse_model_info,
+    info_to_json,
+    resolve_model_family,
 )
-from ..utils.task_context import LLS_TASK_CONTEXT_TYPE, parse_task_context, update_task_context
 
 
 _SIZE_PRESETS = [
@@ -53,17 +55,17 @@ class LLSSimpleEmptyLatent:
     """
     生成空白 Latent，作为 txt2img 推理起点。
 
-    - `Family Default` 时按照 task_context 推荐尺寸自动取默认值。
+    - `Family Default` 时按照模型家族默认尺寸自动取值。
     - `Custom` 时才使用手填 width / height。
     """
 
     CATEGORY = "LLS/Latent"
     FUNCTION = "create_empty_latent"
-    RETURN_TYPES = ("LATENT", "INT", "INT", LLS_TASK_CONTEXT_TYPE)
-    RETURN_NAMES = ("latent", "width", "height", "task_context")
+    RETURN_TYPES = ("LATENT", "INT", "INT", "STRING")
+    RETURN_NAMES = ("latent", "width", "height", "latent_info")
     DESCRIPTION = (
         "Create an empty latent image as the starting point for txt2img. "
-        "Uses task_context recommendations when size_preset is 'Family Default'."
+        "Uses inferred family defaults when size_preset is 'Family Default'."
     )
 
     @classmethod
@@ -74,9 +76,10 @@ class LLSSimpleEmptyLatent:
                 "width": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 8}),
                 "height": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 8}),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
+                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
             },
             "optional": {
-                "task_context": (LLS_TASK_CONTEXT_TYPE,),
+                "model": ("MODEL",),
             },
         }
 
@@ -86,22 +89,23 @@ class LLSSimpleEmptyLatent:
         width: int,
         height: int,
         batch_size: int,
-        task_context=None,
+        model_family: str = "Auto",
+        model=None,
     ):
         if torch is None:
             raise RuntimeError(
                 "[LLS] PyTorch is not available. Make sure this node runs inside a ComfyUI environment."
             ) from _TORCH_ERR
 
-        context = parse_task_context(task_context)
-        info = parse_model_info(context)
-        latent_spec = get_latent_spec(info)
+        family = resolve_model_family(model_family, model=model)
+        defaults = get_family_defaults(family)
+        latent_spec = get_latent_spec(defaults)
         latent_channels = latent_spec["latent_channels"]
         downscale_ratio = latent_spec["downscale_ratio"]
 
         if size_preset == SIZE_PRESET_AUTO:
-            width = int(context.get("recommended_width", info["default_width"]))
-            height = int(context.get("recommended_height", info["default_height"]))
+            width = int(defaults["default_width"])
+            height = int(defaults["default_height"])
         elif size_preset != "Custom":
             try:
                 width, height = [int(part) for part in size_preset.split("x", 1)]
@@ -129,25 +133,24 @@ class LLSSimpleEmptyLatent:
             dtype=dtype,
         )
 
-        next_context = update_task_context(
-            context,
-            resolved_model_family=context.get("resolved_model_family") or info["family"],
-            task_mode="txt2img" if context.get("task_mode") in (None, "", "img2img") else context.get("task_mode"),
-            latent_source="empty_latent",
-            final_width=width,
-            final_height=height,
-            batch_size=batch_size,
-            latent_channels=latent_channels,
-            downscale_ratio=downscale_ratio,
-            size_preset=size_preset,
-            source="LLS Simple Empty Latent",
+        latent_info = info_to_json(
+            {
+                "model_family": family,
+                "task_mode": "txt2img",
+                "latent_source": "empty_latent",
+                "width": width,
+                "height": height,
+                "batch_size": batch_size,
+                "latent_channels": latent_channels,
+                "downscale_ratio": downscale_ratio,
+                "size_preset": size_preset,
+            }
         )
-
         return (
             {"samples": latent, "downscale_ratio_spacial": downscale_ratio, "source": "empty_latent"},
             width,
             height,
-            next_context,
+            latent_info,
         )
 
 

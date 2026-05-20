@@ -11,11 +11,17 @@ from datetime import datetime
 import importlib
 
 from ..utils.model_info import (
+    MODEL_FAMILY_CHOICES,
+    canonicalize_family,
+    get_family_defaults,
     get_latent_spec,
+    info_to_json,
     parse_jsonish_info,
-    parse_model_info,
+    resolve_model_family,
+    resolve_model_name,
+    resolve_text_encoder_names,
+    resolve_vae_name,
 )
-from ..utils.task_context import LLS_TASK_CONTEXT_TYPE, parse_task_context, task_context_to_json, update_task_context
 
 
 try:
@@ -109,6 +115,30 @@ def _resize_image_to(image, target_width: int, target_height: int, resize_mode: 
         raise RuntimeError(f"[LLS] Failed to resize IMAGE for VAE encode: {exc}") from exc
 
 
+def _infer_family_from_latent_or_vae(samples, vae=None) -> str:
+    tagged_family = getattr(vae, "_lls_family", None)
+    if tagged_family and tagged_family not in {"Auto", "auto", ""}:
+        return canonicalize_family(tagged_family)
+
+    if isinstance(samples, dict):
+        try:
+            ratio = int(samples.get("downscale_ratio_spacial", 0))
+            if ratio >= 16:
+                return "FLUX_DEV"
+        except Exception:
+            pass
+        latent_tensor = samples.get("samples")
+        latent_shape = tuple(getattr(latent_tensor, "shape", ()))
+        if len(latent_shape) >= 2:
+            try:
+                if int(latent_shape[1]) >= 16:
+                    return "FLUX_DEV"
+            except Exception:
+                pass
+
+    return "SD1.5"
+
+
 class LLSSimpleVAEEncode:
     """
     把 IMAGE 编码为 LATENT，供 img2img 直接接入现有 KSampler。
@@ -117,8 +147,8 @@ class LLSSimpleVAEEncode:
 
     CATEGORY = "LLS-node"
     FUNCTION = "encode"
-    RETURN_TYPES = ("LATENT", "INT", "INT", LLS_TASK_CONTEXT_TYPE)
-    RETURN_NAMES = ("latent", "width", "height", "task_context")
+    RETURN_TYPES = ("LATENT", "INT", "INT", "STRING")
+    RETURN_NAMES = ("latent", "width", "height", "latent_info")
     DESCRIPTION = "Encode an IMAGE into a LATENT tensor for img2img workflows."
 
     @classmethod
@@ -131,9 +161,11 @@ class LLSSimpleVAEEncode:
                 "size_source": (_SIZE_SOURCES, {"default": "input_image"}),
                 "width": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 8}),
                 "height": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 8}),
+                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
             },
             "optional": {
-                "task_context": (LLS_TASK_CONTEXT_TYPE,),
+                "model": ("MODEL",),
+                "clip": ("CLIP",),
             },
         }
 
@@ -145,7 +177,9 @@ class LLSSimpleVAEEncode:
         size_source: str,
         width: int,
         height: int,
-        task_context=None,
+        model_family: str = "Auto",
+        model=None,
+        clip=None,
     ):
         if image is None:
             raise RuntimeError("[LLS] IMAGE input is required for LLS Simple VAE Encode.")
@@ -154,9 +188,9 @@ class LLSSimpleVAEEncode:
                 "[LLS] Missing VAE. Connect the Loader VAE output or choose an external VAE in the loader."
             )
 
-        context = parse_task_context(task_context)
-        info = parse_model_info(context)
-        latent_spec = get_latent_spec(info)
+        family = resolve_model_family(model_family, model=model, clip=clip)
+        defaults = get_family_defaults(family)
+        latent_spec = get_latent_spec(defaults)
         alignment = max(8, int(latent_spec["downscale_ratio"]))
         batch_size, source_width, source_height = _get_image_dimensions(image)
 
@@ -167,8 +201,8 @@ class LLSSimpleVAEEncode:
             source_width=source_width,
             source_height=source_height,
             model_info={
-                "default_width": context.get("recommended_width", info["default_width"]),
-                "default_height": context.get("recommended_height", info["default_height"]),
+                "default_width": defaults["default_width"],
+                "default_height": defaults["default_height"],
             },
         )
         requested_width = _round_to_multiple(requested_width, alignment)
@@ -209,24 +243,24 @@ class LLSSimpleVAEEncode:
             "downscale_ratio_spacial": int(latent_spec["downscale_ratio"]),
             "source": "image_encode",
         }
-        next_context = update_task_context(
-            context,
-            task_mode="img2img" if context.get("task_mode") in (None, "", "txt2img") else context.get("task_mode"),
-            latent_source="image_encode",
-            input_image_width=source_width,
-            input_image_height=source_height,
-            final_width=final_width,
-            final_height=final_height,
-            batch_size=batch_size,
-            resize_mode=resize_mode,
-            size_source=size_source,
-            vae_source=context.get("vae_source") or info.get("vae_source", "auto"),
-            vae_name=context.get("vae_name") or info.get("vae_name", "unknown"),
-            latent_channels=latent_channels,
-            downscale_ratio=int(latent_spec["downscale_ratio"]),
-            source="LLS Simple VAE Encode",
+        latent_info = info_to_json(
+            {
+                "model_family": family,
+                "task_mode": "img2img",
+                "latent_source": "image_encode",
+                "input_image_width": source_width,
+                "input_image_height": source_height,
+                "width": final_width,
+                "height": final_height,
+                "batch_size": batch_size,
+                "resize_mode": resize_mode,
+                "size_source": size_source,
+                "vae_name": resolve_vae_name(vae, fallback="unknown"),
+                "latent_channels": latent_channels,
+                "downscale_ratio": int(latent_spec["downscale_ratio"]),
+            }
         )
-        return (latent_payload, final_width, final_height, next_context)
+        return (latent_payload, final_width, final_height, latent_info)
 
 
 class LLSSimpleVAEDecode:
@@ -237,8 +271,8 @@ class LLSSimpleVAEDecode:
 
     CATEGORY = "LLS/Image"
     FUNCTION = "decode"
-    RETURN_TYPES = ("IMAGE", LLS_TASK_CONTEXT_TYPE)
-    RETURN_NAMES = ("image", "task_context")
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("image", "decode_info")
     DESCRIPTION = "Decode a LATENT tensor into a pixel IMAGE using the VAE."
 
     @classmethod
@@ -248,18 +282,13 @@ class LLSSimpleVAEDecode:
                 "samples": ("LATENT",),
                 "vae": ("VAE",),
             },
-            "optional": {
-                "task_context": (LLS_TASK_CONTEXT_TYPE,),
-            },
         }
 
-    def decode(self, samples, vae, task_context=None):
-        context = parse_task_context(task_context)
-        info = parse_model_info(context)
-        family = context.get("resolved_model_family") or info["family"]
+    def decode(self, samples, vae):
+        family = _infer_family_from_latent_or_vae(samples, vae)
 
         if vae is None:
-            if info.get("is_flux"):
+            if family.startswith("FLUX"):
                 raise RuntimeError(
                     "[LLS] Missing FLUX AE/VAE. Place ae.safetensors in ComfyUI/models/vae/ "
                     "or set Loader.vae_source to 'external'."
@@ -288,22 +317,21 @@ class LLSSimpleVAEDecode:
         if len(getattr(image, "shape", ())) == 5:
             image = image.reshape(-1, image.shape[-3], image.shape[-2], image.shape[-1])
 
-        latent_spec = get_latent_spec(info)
-        downscale_ratio = int(samples.get("downscale_ratio_spacial", latent_spec["downscale_ratio"]))
+        defaults = get_family_defaults(family)
+        downscale_ratio = int(samples.get("downscale_ratio_spacial", defaults["downscale_ratio"]))
         height = latent_tensor.shape[2] * downscale_ratio
         width = latent_tensor.shape[3] * downscale_ratio
-        next_context = update_task_context(
-            context,
-            resolved_model_family=family,
-            final_width=width,
-            final_height=height,
-            batch_size=latent_tensor.shape[0],
-            vae_name=context.get("vae_name") or info.get("vae_name", "unknown"),
-            decoded=True,
-            decode_stage="vae_decode",
-            source="LLS Simple VAE Decode",
+        decode_info = info_to_json(
+            {
+                "model_family": family,
+                "width": width,
+                "height": height,
+                "batch_size": latent_tensor.shape[0],
+                "vae_name": resolve_vae_name(vae, fallback="unknown"),
+                "decode_stage": "vae_decode",
+            }
         )
-        return (image, next_context)
+        return (image, decode_info)
 
 
 class LLSSaveImage:
@@ -326,8 +354,9 @@ class LLSSaveImage:
                 "save_metadata": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "task_context": (LLS_TASK_CONTEXT_TYPE,),
-                "model_info": (LLS_TASK_CONTEXT_TYPE,),
+                "model": ("MODEL",),
+                "clip": ("CLIP",),
+                "vae": ("VAE",),
                 "prompt_info": ("STRING", {"forceInput": True}),
                 "latent_info": ("STRING", {"forceInput": True}),
                 "sample_info": ("STRING", {"forceInput": True}),
@@ -343,53 +372,55 @@ class LLSSaveImage:
     def _build_metadata(
         self,
         image,
-        task_context=None,
-        model_info=None,
+        model=None,
+        clip=None,
+        vae=None,
         prompt_info: str | None = None,
         latent_info: str | None = None,
         sample_info: str | None = None,
         decode_info: str | None = None,
         upscale_info: str | None = None,
     ) -> dict:
-        context = parse_task_context(task_context or model_info)
-        model = parse_model_info(context)
         prompt = parse_jsonish_info(prompt_info)
         latent = parse_jsonish_info(latent_info)
         sample = parse_jsonish_info(sample_info)
         decode = parse_jsonish_info(decode_info)
         upscale = parse_jsonish_info(upscale_info)
 
-        text_encoder_name = context.get("text_encoder_name") or model.get("text_encoder_name")
-        if context.get("text_encoder_name_2") or model.get("text_encoder_name_2"):
-            joined = [
-                name
-                for name in (
-                    context.get("text_encoder_name_1") or model.get("text_encoder_name_1"),
-                    context.get("text_encoder_name_2") or model.get("text_encoder_name_2"),
-                )
-                if name
-            ]
-            text_encoder_name = ", ".join(joined)
+        family = prompt.get("model_family") or latent.get("model_family") or decode.get("model_family")
+        if not family:
+            family = resolve_model_family("Auto", model=model, clip=clip)
+
+        text_encoder_name = resolve_text_encoder_names(clip).get("text_encoder_name", "")
+        checkpoint_name = resolve_model_name(
+            model=model,
+            clip=clip,
+            fallback=prompt.get("checkpoint_name") or latent.get("checkpoint_name") or decode.get("checkpoint_name") or "",
+        )
+        vae_name = resolve_vae_name(
+            vae,
+            fallback=decode.get("vae_name") or latent.get("vae_name") or "",
+        )
 
         metadata = {
-            "positive_prompt": context.get("positive_prompt") or prompt.get("positive_prompt", ""),
-            "negative_prompt": context.get("negative_prompt") or prompt.get("negative_prompt", ""),
-            "seed": context.get("seed", sample.get("seed")),
-            "model_family": context.get("resolved_model_family") or context.get("model_family") or model.get("family"),
-            "checkpoint_name": context.get("checkpoint_name") or model.get("checkpoint_name"),
-            "vae_name": context.get("vae_name") or decode.get("vae_name") or model.get("vae_name"),
+            "positive_prompt": prompt.get("positive_prompt", ""),
+            "negative_prompt": prompt.get("negative_prompt", ""),
+            "seed": sample.get("seed"),
+            "model_family": family,
+            "checkpoint_name": checkpoint_name,
+            "vae_name": vae_name,
             "text_encoder_name": text_encoder_name,
-            "steps": context.get("steps", sample.get("steps")),
-            "cfg": context.get("cfg", sample.get("cfg")),
-            "guidance": context.get("guidance", sample.get("guidance")),
-            "sampler_name": context.get("sampler_name", sample.get("sampler_name")),
-            "scheduler": context.get("scheduler", sample.get("scheduler")),
-            "denoise": context.get("denoise", sample.get("denoise")),
-            "width": context.get("final_width") or decode.get("width") or latent.get("width") or image.shape[2],
-            "height": context.get("final_height") or decode.get("height") or latent.get("height") or image.shape[1],
-            "batch_size": context.get("batch_size") or latent.get("batch_size") or decode.get("batch_size") or image.shape[0],
-            "upscale_mode": context.get("upscale_mode") or upscale.get("mode"),
-            "scale": context.get("upscale_scale") or upscale.get("scale"),
+            "steps": sample.get("steps"),
+            "cfg": sample.get("cfg"),
+            "guidance": sample.get("guidance"),
+            "sampler_name": sample.get("sampler_name"),
+            "scheduler": sample.get("scheduler"),
+            "denoise": sample.get("denoise"),
+            "width": decode.get("width") or latent.get("width") or image.shape[2],
+            "height": decode.get("height") or latent.get("height") or image.shape[1],
+            "batch_size": decode.get("batch_size") or latent.get("batch_size") or image.shape[0],
+            "upscale_mode": upscale.get("mode") or upscale.get("upscale_mode"),
+            "scale": upscale.get("scale") or upscale.get("upscale_scale"),
             "timestamp": datetime.now().isoformat(timespec="seconds"),
         }
         return metadata
@@ -399,8 +430,9 @@ class LLSSaveImage:
         image,
         filename_prefix: str = "LLS",
         save_metadata: bool = True,
-        task_context=None,
-        model_info=None,
+        model=None,
+        clip=None,
+        vae=None,
         prompt_info: str | None = None,
         latent_info: str | None = None,
         sample_info: str | None = None,
@@ -417,15 +449,15 @@ class LLSSaveImage:
         if save_metadata:
             merged_extra_pnginfo["lls_metadata"] = self._build_metadata(
                 image=image,
-                task_context=task_context,
-                model_info=model_info,
+                model=model,
+                clip=clip,
+                vae=vae,
                 prompt_info=prompt_info,
                 latent_info=latent_info,
                 sample_info=sample_info,
                 decode_info=decode_info,
                 upscale_info=upscale_info,
             )
-            merged_extra_pnginfo["lls_task_context"] = task_context_to_json(task_context or model_info)
         return saver.save_images(
             image,
             filename_prefix=filename_prefix,

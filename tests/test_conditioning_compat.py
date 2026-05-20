@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import pathlib
 import sys
 import unittest
@@ -67,11 +68,12 @@ class TestConditioningCompatibility(unittest.TestCase):
         node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimplePromptEncode"]
         node = node_cls()
 
-        positive, negative, task_context = node.encode(
-            LegacyClipStub(),
-            "a cat",
-            "low quality",
-            -2,
+        positive, negative, prompt_info = node.encode(
+            clip=LegacyClipStub(),
+            positive_prompt="a cat",
+            negative_prompt="low quality",
+            clip_skip=-2,
+            model_family="Auto",
         )
 
         self.assertEqual(
@@ -82,19 +84,22 @@ class TestConditioningCompatibility(unittest.TestCase):
             negative,
             [["cond::low quality", {"pooled_output": "pooled::low quality"}]],
         )
-        self.assertEqual(task_context["clip_skip"], -2)
-        self.assertEqual(task_context["prompt_mode"], "clip")
+        payload = json.loads(prompt_info)
+        self.assertEqual(payload["clip_skip"], -2)
+        self.assertEqual(payload["prompt_mode"], "clip")
+        self.assertEqual(payload["model_family"], "SD1.5")
 
     def test_simple_prompt_encode_normalizes_none_clip_skip(self):
         plugin = load_plugin_package()
         node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimplePromptEncode"]
         node = node_cls()
 
-        positive, negative, task_context = node.encode(
-            LegacyClipStub(),
-            "a cat",
-            "low quality",
-            None,
+        positive, negative, prompt_info = node.encode(
+            clip=LegacyClipStub(),
+            positive_prompt="a cat",
+            negative_prompt="low quality",
+            clip_skip=None,
+            model_family="Auto",
         )
 
         self.assertEqual(
@@ -105,7 +110,8 @@ class TestConditioningCompatibility(unittest.TestCase):
             negative,
             [["cond::low quality", {"pooled_output": "pooled::low quality"}]],
         )
-        self.assertEqual(task_context["clip_skip"], -1)
+        payload = json.loads(prompt_info)
+        self.assertEqual(payload["clip_skip"], -1)
 
     def test_universal_backend_falls_back_for_legacy_clip(self):
         load_plugin_package()

@@ -11,12 +11,14 @@ import random
 
 from ..utils.model_info import (
     FAMILY_DEFAULT_PRESET,
+    MODEL_FAMILY_CHOICES,
+    get_family_defaults,
     get_sampling_preset,
+    infer_task_mode_from_latent,
     info_to_json,
     is_flux_family,
-    parse_model_info,
+    resolve_model_family,
 )
-from ..utils.task_context import LLS_TASK_CONTEXT_TYPE, parse_task_context, update_task_context
 
 # ---------- 防御性导入 ----------
 
@@ -197,7 +199,6 @@ def _common_ksampler(
     )
 
     out = latent.copy()
-    out.pop("downscale_ratio_spacial", None)
     out["samples"] = sampled
     return out
 
@@ -213,8 +214,8 @@ class LLSSimpleKSampler:
 
     CATEGORY = "LLS/Sampling"
     FUNCTION = "sample"
-    RETURN_TYPES = ("LATENT", "STRING", LLS_TASK_CONTEXT_TYPE)
-    RETURN_NAMES = ("latent", "sample_info", "task_context")
+    RETURN_TYPES = ("LATENT", "STRING")
+    RETURN_NAMES = ("latent", "sample_info")
     DESCRIPTION = (
         "Basic KSampler node. Reuses ComfyUI's native sampling pipeline. "
         "quality_preset overrides steps/cfg/denoise when not 'Manual'. "
@@ -229,6 +230,7 @@ class LLSSimpleKSampler:
                 "positive": ("CONDITIONING",),
                 "negative": ("CONDITIONING",),
                 "latent_image": ("LATENT",),
+                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
                 "quality_preset": (_QUALITY_PRESETS, {"default": FAMILY_DEFAULT_PRESET}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xFFFFFFFFFFFFFFFF}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
@@ -240,9 +242,6 @@ class LLSSimpleKSampler:
                     _PRIMITIVE_NUMBER_INPUT,
                     {"default": 3.5, "widgetType": "FLOAT", "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.1},
                 ),
-            },
-            "optional": {
-                "task_context": (LLS_TASK_CONTEXT_TYPE,),
             },
         }
 
@@ -265,6 +264,7 @@ class LLSSimpleKSampler:
         positive,
         negative,
         latent_image,
+        model_family: str,
         quality_preset: str,
         seed: int,
         steps: int,
@@ -273,7 +273,6 @@ class LLSSimpleKSampler:
         scheduler: str,
         denoise: float,
         flux_guidance,
-        task_context=None,
     ):
         if comfy_sample is None:
             raise RuntimeError(
@@ -286,30 +285,21 @@ class LLSSimpleKSampler:
                 "Make sure this node runs inside a ComfyUI environment."
             ) from _COMFY_SAMPLERS_ERR
 
-        context = parse_task_context(task_context)
-        info = parse_model_info(context)
-        family = context.get("resolved_model_family") or info["family"]
-        latent_source = latent_image.get("source") or context.get("latent_source")
-        default_flux_guidance = context.get("recommended_guidance")
-        if default_flux_guidance is None:
-            default_flux_guidance = info.get("guidance", info.get("default_guidance"))
-        effective_task_mode = context.get("task_mode") or "txt2img"
-        if latent_source == "empty_latent":
-            effective_task_mode = "txt2img"
-        elif latent_source == "image_encode":
-            effective_task_mode = "img2img"
+        family = resolve_model_family(model_family, model=model)
+        defaults = get_family_defaults(family)
+        default_flux_guidance = defaults.get("default_guidance")
+        effective_task_mode = infer_task_mode_from_latent(latent_image)
 
         if quality_preset == FAMILY_DEFAULT_PRESET:
-            steps = int(context.get("recommended_steps", steps))
-            cfg = float(context.get("recommended_cfg", cfg))
-            sampler_name = str(context.get("recommended_sampler", sampler_name))
-            scheduler = str(context.get("recommended_scheduler", scheduler))
-            denoise = float(context.get("recommended_denoise", denoise))
-            context_guidance = default_flux_guidance
-            if context_guidance is not None:
-                flux_guidance = float(context_guidance)
+            steps = int(defaults["default_steps"])
+            cfg = float(defaults["default_cfg"])
+            sampler_name = str(defaults["default_sampler"])
+            scheduler = str(defaults["default_scheduler"])
+            denoise = float(defaults["default_denoise"])
+            if default_flux_guidance is not None:
+                flux_guidance = float(default_flux_guidance)
         else:
-            preset = get_sampling_preset(info, quality_preset)
+            preset = get_sampling_preset(defaults, quality_preset)
             if preset is not None:
                 steps = int(preset["steps"])
                 cfg = float(preset["cfg"])
@@ -321,7 +311,7 @@ class LLSSimpleKSampler:
 
         flux_guidance = _normalize_flux_guidance(flux_guidance, fallback=default_flux_guidance)
 
-        if is_flux_family(family) and context.get("supports_flux_guidance", True):
+        if is_flux_family(family):
             guidance_value = flux_guidance
         else:
             guidance_value = None
@@ -332,9 +322,6 @@ class LLSSimpleKSampler:
                 negative = node_helpers.conditioning_set_values(negative, {"guidance": guidance_value})
             except Exception:
                 pass
-
-        if quality_preset not in {"Manual", FAMILY_DEFAULT_PRESET} and effective_task_mode == "img2img":
-            denoise = float(context.get("recommended_denoise", denoise))
 
         # seed = -1 时随机生成
         actual_seed = seed
@@ -374,22 +361,7 @@ class LLSSimpleKSampler:
                 "task_mode": effective_task_mode,
             }
         )
-        next_context = update_task_context(
-            context,
-            resolved_model_family=family,
-            task_mode=effective_task_mode,
-            sampler_name=sampler_name,
-            scheduler=scheduler,
-            steps=steps,
-            cfg=cfg,
-            seed=actual_seed,
-            denoise=denoise,
-            guidance=guidance_value,
-            sampled=True,
-            source="LLS Simple KSampler",
-        )
-
-        return (result_latent, sample_info, next_context)
+        return (result_latent, sample_info)
 
 
 # ---------- 注册表 ----------

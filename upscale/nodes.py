@@ -11,8 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..utils.model_info import parse_model_info
-from ..utils.task_context import LLS_TASK_CONTEXT_TYPE, parse_task_context, update_task_context
+from ..utils.model_info import info_to_json
 
 # ---------- 从根模块导入共享工具函数 ----------
 
@@ -217,8 +216,8 @@ class LLSUpscaleSwitcher:
 
     CATEGORY = "LLS/Upscale"
     FUNCTION = "upscale"
-    RETURN_TYPES = ("IMAGE", LLS_TASK_CONTEXT_TYPE)
-    RETURN_NAMES = ("image", "task_context")
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("image", "upscale_info")
     DESCRIPTION = "Switch between ComfyUI upscale models and PyTorch interpolation."
 
     @classmethod
@@ -235,53 +234,37 @@ class LLSUpscaleSwitcher:
                 "tile": ("INT", {"default": 512, "min": 128, "max": 2048, "step": 64}),
                 "overlap": ("INT", {"default": 32, "min": 0, "max": 256, "step": 8}),
             },
-            "optional": {
-                "task_context": (LLS_TASK_CONTEXT_TYPE,),
-            },
         }
 
-    def upscale(self, image, mode: str, scale: float, interpolation: str, model_name: str, tile: int, overlap: int, task_context=None):
-        context = parse_task_context(task_context)
-        info = parse_model_info(context)
+    def upscale(self, image, mode: str, scale: float, interpolation: str, model_name: str, tile: int, overlap: int):
         requested_mode = mode
         warning = None
         if mode not in UPSCALE_MODE_CHOICES:
             raise RuntimeError(f"Unsupported mode '{mode}'. Expected one of {UPSCALE_MODE_CHOICES}.")
-        if not context.get("enable_upscale", True) and mode != "none":
-            return (
-                image,
-                update_task_context(
-                    context,
-                    upscaled=False,
-                    upscale_mode="disabled_by_task_context",
-                    upscale_scale=1.0,
-                    source="LLS Upscale Switcher",
-                ),
-            )
         if mode == "none":
             return (
                 image,
-                update_task_context(
-                    context,
-                    upscaled=False,
-                    upscale_mode="none",
-                    requested_upscale_mode=requested_mode,
-                    upscale_scale=1.0,
-                    source="LLS Upscale Switcher",
+                info_to_json(
+                    {
+                        "mode": "none",
+                        "requested_mode": requested_mode,
+                        "scale": 1.0,
+                        "upscaled": False,
+                    }
                 ),
             )
         if mode in {"interpolation", "pytorch"}:
             result = self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)[0]
             return (
                 result,
-                update_task_context(
-                    context,
-                    upscaled=True,
-                    upscale_mode="interpolation",
-                    requested_upscale_mode=requested_mode,
-                    upscale_scale=scale,
-                    interpolation=interpolation,
-                    source="LLS Upscale Switcher",
+                info_to_json(
+                    {
+                        "mode": "interpolation",
+                        "requested_mode": requested_mode,
+                        "scale": scale,
+                        "interpolation": interpolation,
+                        "upscaled": True,
+                    }
                 ),
             )
         if mode == "latent_upscale":
@@ -289,15 +272,15 @@ class LLSUpscaleSwitcher:
             result = self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)[0]
             return (
                 result,
-                update_task_context(
-                    context,
-                    upscaled=True,
-                    upscale_mode="interpolation",
-                    requested_upscale_mode=requested_mode,
-                    upscale_scale=scale,
-                    interpolation=interpolation,
-                    upscale_warning=warning,
-                    source="LLS Upscale Switcher",
+                info_to_json(
+                    {
+                        "mode": "interpolation",
+                        "requested_mode": requested_mode,
+                        "scale": scale,
+                        "interpolation": interpolation,
+                        "warning": warning,
+                        "upscaled": True,
+                    }
                 ),
             )
         if _is_missing_upscale_model_selection(model_name):
@@ -309,32 +292,32 @@ class LLSUpscaleSwitcher:
             result = self._upscale_with_pytorch(image=image, scale=scale, interpolation=interpolation)[0]
             return (
                 result,
-                update_task_context(
-                    context,
-                    upscaled=True,
-                    upscale_mode="interpolation",
-                    requested_upscale_mode=requested_mode,
-                    upscale_scale=scale,
-                    interpolation=interpolation,
-                    upscale_warning=warning,
-                    source="LLS Upscale Switcher",
+                info_to_json(
+                    {
+                        "mode": "interpolation",
+                        "requested_mode": requested_mode,
+                        "scale": scale,
+                        "interpolation": interpolation,
+                        "warning": warning,
+                        "upscaled": True,
+                    }
                 ),
             )
         result = self._upscale_with_model(image=image, model_name=model_name, tile=tile, overlap=overlap)[0]
         actual_mode = "tile_upscale" if requested_mode == "tile_upscale" else "upscale_model"
         return (
             result,
-            update_task_context(
-                context,
-                upscaled=True,
-                upscale_mode=actual_mode,
-                requested_upscale_mode=requested_mode,
-                upscale_scale=scale,
-                model_name=model_name,
-                tile=tile,
-                overlap=overlap,
-                upscale_warning=warning,
-                source="LLS Upscale Switcher",
+            info_to_json(
+                {
+                    "mode": actual_mode,
+                    "requested_mode": requested_mode,
+                    "scale": scale,
+                    "model_name": model_name,
+                    "tile": tile,
+                    "overlap": overlap,
+                    "warning": warning,
+                    "upscaled": True,
+                }
             ),
         )
 
