@@ -248,6 +248,89 @@ def build_canvas_info(
     }
 
 
+def get_image_size(image: Any) -> tuple[int, int]:
+    shape = getattr(image, "shape", None)
+    if not isinstance(shape, (list, tuple)) or len(shape) != 4:
+        raise RuntimeError("[LLS] image must have shape [batch, height, width, channels].")
+
+    _, height, width, _ = shape
+    width = _coerce_int(width, 0)
+    height = _coerce_int(height, 0)
+    if width <= 0 or height <= 0:
+        raise RuntimeError("[LLS] image width and height must be positive.")
+    return width, height
+
+
+def get_mask_metrics(mask: Any, image_size: tuple[int, int]) -> tuple[tuple[int, int, int, int] | None, float]:
+    shape = getattr(mask, "shape", None)
+    if not isinstance(shape, (list, tuple)) or len(shape) != 3:
+        raise RuntimeError("[LLS] mask must have shape [batch, height, width].")
+
+    raw_bbox = getattr(mask, "mask_bbox", None)
+    mask_bbox = None
+    if isinstance(raw_bbox, (list, tuple)) and len(raw_bbox) == 4:
+        mask_bbox = clamp_box(tuple(_coerce_int(value, 0) for value in raw_bbox), image_size)
+
+    mask_area_ratio = _coerce_float(getattr(mask, "mask_area_ratio", 0.0), 0.0)
+    mask_area_ratio = max(0.0, min(1.0, mask_area_ratio))
+    return mask_bbox, mask_area_ratio
+
+
+def resize_image_to(image: Any, width: int, height: int) -> Any:
+    if hasattr(image, "resized"):
+        return image.resized(width, height)
+    current_width, current_height = get_image_size(image)
+    if (current_width, current_height) == (width, height):
+        return image
+    raise RuntimeError("[LLS] image object does not support resizing.")
+
+
+def resize_mask_to(mask: Any, width: int, height: int) -> Any:
+    shape = getattr(mask, "shape", None)
+    if not isinstance(shape, (list, tuple)) or len(shape) != 3:
+        raise RuntimeError("[LLS] mask must have shape [batch, height, width].")
+    if hasattr(mask, "resized"):
+        return mask.resized(width, height)
+    _, current_height, current_width = shape
+    if (_coerce_int(current_width, 0), _coerce_int(current_height, 0)) == (width, height):
+        return mask
+    raise RuntimeError("[LLS] mask object does not support resizing.")
+
+
+def expand_canvas_image(image: Any, width: int, height: int) -> Any:
+    if hasattr(image, "canvas_expanded"):
+        return image.canvas_expanded(width, height)
+    current_width, current_height = get_image_size(image)
+    if (current_width, current_height) == (width, height):
+        return image
+    raise RuntimeError("[LLS] image object does not support canvas expansion.")
+
+
+def expand_canvas_mask(mask: Any, width: int, height: int) -> Any:
+    shape = getattr(mask, "shape", None)
+    if not isinstance(shape, (list, tuple)) or len(shape) != 3:
+        raise RuntimeError("[LLS] mask must have shape [batch, height, width].")
+    if hasattr(mask, "canvas_expanded"):
+        return mask.canvas_expanded(width, height)
+    _, current_height, current_width = shape
+    if (_coerce_int(current_width, 0), _coerce_int(current_height, 0)) == (width, height):
+        return mask
+    raise RuntimeError("[LLS] mask object does not support canvas expansion.")
+
+
+def make_noise_mask(mask: Any, latent_samples: Any) -> Any:
+    latent_shape = getattr(latent_samples, "shape", None)
+    if not isinstance(latent_shape, (list, tuple)) or len(latent_shape) != 4:
+        raise RuntimeError("[LLS] latent samples must have shape [batch, channels, height, width].")
+
+    _, _, latent_height, latent_width = latent_shape
+    latent_width = _coerce_int(latent_width, 0)
+    latent_height = _coerce_int(latent_height, 0)
+    if latent_width <= 0 or latent_height <= 0:
+        raise RuntimeError("[LLS] latent samples must have positive height and width.")
+    return resize_mask_to(mask, latent_width, latent_height)
+
+
 def resolve_adapter_mode(adapter_mode: str, model_family: str) -> str:
     mode = str(adapter_mode or "auto")
     if mode != "auto":

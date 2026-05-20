@@ -1,0 +1,173 @@
+import unittest
+
+try:
+    from .test_repair_helpers import FakeMask, FakeVAE, FakeTensor, load_plugin_package
+except ImportError:  # pragma: no cover - discovery mode imports from top level
+    from test_repair_helpers import FakeMask, FakeVAE, FakeTensor, load_plugin_package
+
+
+class TestRepairPrepare(unittest.TestCase):
+    def test_prepare_region_with_latent_mask_attaches_noise_mask(self):
+        plugin = load_plugin_package()
+        node = plugin.NODE_CLASS_MAPPINGS["LLSSimpleRepairPrepare"]()
+
+        image = FakeTensor((1, 1024, 1024, 3), label="region-image")
+        mask = FakeMask(
+            (1, 1024, 1024),
+            mask_bbox=(128, 128, 384, 384),
+            mask_area_ratio=0.05,
+            label="region-mask",
+        )
+
+        latent, work_image, work_mask, repair_info, recommended_denoise = node.prepare(
+            image=image,
+            mask=mask,
+            vae=FakeVAE(),
+            repair_scope="region",
+            repair_kernel="latent_mask",
+            task_hint="repair",
+            mask_grow=24,
+            mask_blur=8.0,
+            mask_threshold=0.5,
+            invert_mask=False,
+            crop_context=64,
+            crop_context_factor=1.5,
+            min_size=256,
+            max_size=1024,
+            resize_mode="fit",
+            expand_left=0,
+            expand_right=0,
+            expand_top=0,
+            expand_bottom=0,
+            canvas_fill="edge",
+            auto_recommend="enabled",
+            model_info={"model_family": "SDXL", "model_role": "base"},
+        )
+
+        self.assertEqual(work_image.shape, (1, 1024, 1024, 3))
+        self.assertEqual(work_mask.shape, (1, 1024, 1024))
+        self.assertIn("noise_mask", latent)
+        self.assertEqual(repair_info["repair_scope"], "region")
+        self.assertEqual(repair_info["repair_kernel"], "latent_mask")
+        self.assertEqual(recommended_denoise, 0.45)
+
+    def test_prepare_crop_with_vae_inpaint_populates_crop_metadata(self):
+        plugin = load_plugin_package()
+        node = plugin.NODE_CLASS_MAPPINGS["LLSSimpleRepairPrepare"]()
+
+        image = FakeTensor((1, 768, 1024, 3), label="crop-image")
+        mask = FakeMask(
+            (1, 768, 1024),
+            mask_bbox=(200, 120, 420, 360),
+            mask_area_ratio=0.06,
+            label="crop-mask",
+        )
+
+        latent, work_image, work_mask, repair_info, recommended_denoise = node.prepare(
+            image=image,
+            mask=mask,
+            vae=FakeVAE(),
+            repair_scope="crop",
+            repair_kernel="vae_inpaint",
+            task_hint="content",
+            mask_grow=24,
+            mask_blur=8.0,
+            mask_threshold=0.5,
+            invert_mask=False,
+            crop_context=64,
+            crop_context_factor=1.5,
+            min_size=256,
+            max_size=1024,
+            resize_mode="fit",
+            expand_left=0,
+            expand_right=0,
+            expand_top=0,
+            expand_bottom=0,
+            canvas_fill="edge",
+            auto_recommend="enabled",
+            model_info={"model_family": "SDXL", "model_role": "base"},
+        )
+
+        self.assertEqual(repair_info["repair_scope"], "crop")
+        self.assertIsNotNone(repair_info["crop_box"])
+        self.assertGreater(repair_info["crop_scale"], 0.0)
+        self.assertEqual(repair_info["work_size"], (work_image.shape[2], work_image.shape[1]))
+        self.assertEqual(recommended_denoise, 0.65)
+        self.assertEqual(latent["source"], "repair_prepare_crop")
+        self.assertEqual(work_mask.shape, work_image.shape[:3])
+
+    def test_prepare_canvas_with_vae_inpaint_supports_empty_mask(self):
+        plugin = load_plugin_package()
+        node = plugin.NODE_CLASS_MAPPINGS["LLSSimpleRepairPrepare"]()
+
+        image = FakeTensor((1, 640, 640, 3), label="canvas-image")
+        mask = FakeMask((1, 640, 640), mask_bbox=None, mask_area_ratio=0.0, label="canvas-mask")
+
+        latent, work_image, work_mask, repair_info, recommended_denoise = node.prepare(
+            image=image,
+            mask=mask,
+            vae=FakeVAE(),
+            repair_scope="auto",
+            repair_kernel="vae_inpaint",
+            task_hint="fill",
+            mask_grow=24,
+            mask_blur=8.0,
+            mask_threshold=0.5,
+            invert_mask=False,
+            crop_context=64,
+            crop_context_factor=1.5,
+            min_size=256,
+            max_size=1024,
+            resize_mode="fit",
+            expand_left=128,
+            expand_right=0,
+            expand_top=0,
+            expand_bottom=0,
+            canvas_fill="edge",
+            auto_recommend="enabled",
+            model_info={"model_family": "SDXL", "model_role": "base"},
+        )
+
+        self.assertEqual(work_image.shape, (1, 640, 768, 3))
+        self.assertEqual(work_mask.shape, (1, 640, 768))
+        self.assertEqual(repair_info["repair_scope"], "canvas")
+        self.assertEqual(repair_info["canvas_expand"], [128, 0, 0, 0])
+        self.assertEqual(recommended_denoise, 0.90)
+        self.assertEqual(latent["source"], "repair_prepare_canvas")
+
+    def test_prepare_requires_vae(self):
+        plugin = load_plugin_package()
+        node = plugin.NODE_CLASS_MAPPINGS["LLSSimpleRepairPrepare"]()
+
+        image = FakeTensor((1, 1024, 1024, 3), label="missing-vae-image")
+        mask = FakeMask((1, 1024, 1024), mask_bbox=(0, 0, 64, 64), mask_area_ratio=0.01)
+
+        with self.assertRaisesRegex(RuntimeError, "Missing VAE"):
+            node.prepare(
+                image=image,
+                mask=mask,
+                vae=None,
+                repair_scope="region",
+                repair_kernel="latent_mask",
+                task_hint="repair",
+                mask_grow=24,
+                mask_blur=8.0,
+                mask_threshold=0.5,
+                invert_mask=False,
+                crop_context=64,
+                crop_context_factor=1.5,
+                min_size=256,
+                max_size=1024,
+                resize_mode="fit",
+                expand_left=0,
+                expand_right=0,
+                expand_top=0,
+                expand_bottom=0,
+                canvas_fill="edge",
+                auto_recommend="enabled",
+                model_info={"model_family": "SDXL", "model_role": "base"},
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()
