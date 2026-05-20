@@ -8,25 +8,55 @@ MODULE_NAME = "lls_node_test_repair"
 
 
 class FakeTensor:
-    def __init__(self, shape, label="image"):
+    def __init__(self, shape, label="image", crop_box=None):
         self.shape = tuple(shape)
         self.label = label
+        self.crop_box = crop_box
+
+    def cropped(self, x1, y1, x2, y2):
+        batch, _, _, channels = self.shape
+        crop_box = (x1, y1, x2, y2)
+        return FakeTensor(
+            (batch, max(0, y2 - y1), max(0, x2 - x1), channels),
+            label=f"{self.label}:crop[{x1},{y1},{x2},{y2}]",
+            crop_box=crop_box,
+        )
 
     def resized(self, width, height):
         batch, _, _, channels = self.shape
-        return FakeTensor((batch, height, width, channels), label=f"{self.label}:resized")
+        return FakeTensor(
+            (batch, height, width, channels),
+            label=f"{self.label}:resized",
+            crop_box=self.crop_box,
+        )
 
     def canvas_expanded(self, width, height):
         batch, _, _, channels = self.shape
-        return FakeTensor((batch, height, width, channels), label=f"{self.label}:canvas")
+        return FakeTensor(
+            (batch, height, width, channels),
+            label=f"{self.label}:canvas",
+            crop_box=self.crop_box,
+        )
 
 
 class FakeMask:
-    def __init__(self, shape, mask_bbox=None, mask_area_ratio=0.0, label="mask"):
+    def __init__(self, shape, mask_bbox=None, mask_area_ratio=0.0, label="mask", crop_box=None):
         self.shape = tuple(shape)
         self.mask_bbox = mask_bbox
         self.mask_area_ratio = float(mask_area_ratio)
         self.label = label
+        self.crop_box = crop_box
+
+    def cropped(self, x1, y1, x2, y2):
+        batch, _, _ = self.shape
+        crop_box = (x1, y1, x2, y2)
+        return FakeMask(
+            (batch, max(0, y2 - y1), max(0, x2 - x1)),
+            mask_bbox=self.mask_bbox,
+            mask_area_ratio=self.mask_area_ratio,
+            label=f"{self.label}:crop[{x1},{y1},{x2},{y2}]",
+            crop_box=crop_box,
+        )
 
     def resized(self, width, height):
         batch, _, _ = self.shape
@@ -35,6 +65,7 @@ class FakeMask:
             mask_bbox=self.mask_bbox,
             mask_area_ratio=self.mask_area_ratio,
             label=f"{self.label}:resized",
+            crop_box=self.crop_box,
         )
 
     def canvas_expanded(self, width, height):
@@ -44,6 +75,7 @@ class FakeMask:
             mask_bbox=self.mask_bbox,
             mask_area_ratio=self.mask_area_ratio,
             label=f"{self.label}:canvas",
+            crop_box=self.crop_box,
         )
 
 

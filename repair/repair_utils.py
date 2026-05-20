@@ -297,6 +297,32 @@ def resize_mask_to(mask: Any, width: int, height: int) -> Any:
     raise RuntimeError("[LLS] mask object does not support resizing.")
 
 
+def crop_image_to(image: Any, box: tuple[int, int, int, int]) -> Any:
+    cropped_box = clamp_box(box, get_image_size(image))
+    if hasattr(image, "cropped"):
+        return image.cropped(*cropped_box)
+
+    current_width, current_height = get_image_size(image)
+    if cropped_box == (0, 0, current_width, current_height):
+        return image
+    raise RuntimeError("[LLS] image object does not support cropping.")
+
+
+def crop_mask_to(mask: Any, box: tuple[int, int, int, int]) -> Any:
+    shape = getattr(mask, "shape", None)
+    if not isinstance(shape, (list, tuple)) or len(shape) != 3:
+        raise RuntimeError("[LLS] mask must have shape [batch, height, width].")
+
+    _, current_height, current_width = shape
+    cropped_box = clamp_box(box, (_coerce_int(current_width, 0), _coerce_int(current_height, 0)))
+    if hasattr(mask, "cropped"):
+        return mask.cropped(*cropped_box)
+
+    if cropped_box == (0, 0, _coerce_int(current_width, 0), _coerce_int(current_height, 0)):
+        return mask
+    raise RuntimeError("[LLS] mask object does not support cropping.")
+
+
 def expand_canvas_image(image: Any, width: int, height: int) -> Any:
     if hasattr(image, "canvas_expanded"):
         return image.canvas_expanded(width, height)

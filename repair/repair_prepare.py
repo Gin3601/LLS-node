@@ -3,6 +3,8 @@ from __future__ import annotations
 from .repair_utils import (
     build_canvas_info,
     compute_crop_box,
+    crop_image_to,
+    crop_mask_to,
     expand_canvas_image,
     expand_canvas_mask,
     get_image_size,
@@ -188,8 +190,10 @@ class LLSSimpleRepairPrepare:
                 int(max_size),
                 resize_mode,
             )
-            work_image = resize_image_to(image, work_width, work_height)
-            work_mask = resize_mask_to(mask, work_width, work_height)
+            cropped_image = crop_image_to(image, crop_box)
+            cropped_mask = crop_mask_to(mask, crop_box)
+            work_image = resize_image_to(cropped_image, work_width, work_height)
+            work_mask = resize_mask_to(cropped_mask, work_width, work_height)
             latent_samples = vae.encode(work_image)
             latent = {"samples": latent_samples, "source": "repair_prepare_crop"}
             if effective_kernel == "latent_mask":

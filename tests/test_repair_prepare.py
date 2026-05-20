@@ -95,6 +95,10 @@ class TestRepairPrepare(unittest.TestCase):
         self.assertEqual(recommended_denoise, 0.65)
         self.assertEqual(latent["source"], "repair_prepare_crop")
         self.assertEqual(work_mask.shape, work_image.shape[:3])
+        self.assertIn(":crop[", work_image.label)
+        self.assertIn(":crop[", work_mask.label)
+        self.assertEqual(work_image.crop_box, tuple(repair_info["crop_box"]))
+        self.assertEqual(work_mask.crop_box, tuple(repair_info["crop_box"]))
 
     def test_prepare_canvas_with_vae_inpaint_supports_empty_mask(self):
         plugin = load_plugin_package()
