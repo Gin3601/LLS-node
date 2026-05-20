@@ -363,3 +363,51 @@ def get_sampling_preset(model_info: dict[str, Any] | str | None, quality_preset:
     preset_name = quality_preset if quality_preset in family_presets else FAMILY_DEFAULT_PRESET
     preset = dict(family_presets[preset_name])
     return preset
+
+
+# ---------- 隐式推导工具函数 ----------
+
+def infer_family_from_clip(clip) -> str:
+    """从 CLIP 对象的 tokenizer 结构自动推断模型家族。"""
+    try:
+        tokens = clip.tokenize("")
+    except Exception:
+        return "SD1.5"
+    if "t5xxl" in tokens:
+        return "FLUX_DEV"
+    if "g" in tokens:
+        return "SDXL"
+    return "SD1.5"
+
+
+def infer_family_from_model(model) -> str:
+    """从 MODEL 对象自动推断模型家族。"""
+    lls_family = getattr(model, "_lls_family", None)
+    if lls_family and lls_family not in ("auto", "Auto", ""):
+        return canonicalize_family(lls_family)
+
+    try:
+        model_type = getattr(model, "model_type", None)
+        if model_type is not None and "FLUX" in str(model_type).upper():
+            return "FLUX_DEV"
+    except Exception:
+        pass
+
+    try:
+        latent_format = model.get_model_object("latent_format")
+        channels = getattr(latent_format, "latent_channels", None)
+        if channels is not None and int(channels) >= 16:
+            return "FLUX_DEV"
+    except Exception:
+        pass
+
+    return "SD1.5"
+
+
+def infer_task_mode_from_latent(latent: dict) -> str:
+    """从 LATENT dict 的 source 字段自动推断任务模式。"""
+    if isinstance(latent, dict):
+        source = latent.get("source", "empty_latent")
+        if source == "image_encode":
+            return "img2img"
+    return "txt2img"

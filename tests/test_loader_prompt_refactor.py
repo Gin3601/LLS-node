@@ -269,7 +269,14 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         required = node_cls.INPUT_TYPES()["required"]
         optional = node_cls.INPUT_TYPES()["optional"]
 
-        self.assertEqual(node_cls.RETURN_TYPES, ("MODEL", "LLS_TEXT_ENCODER", "VAE", "LLS_TASK_CONTEXT"))
+        self.assertEqual(
+            node_cls.RETURN_TYPES,
+            ("MODEL", "CLIP", "VAE", "LLS_TASK_CONTEXT", "LLS_TEXT_ENCODER"),
+        )
+        self.assertEqual(
+            node_cls.RETURN_NAMES,
+            ("model", "clip", "vae", "task_context", "text_encoder"),
+        )
         self.assertEqual(
             tuple(required.keys()),
             (
@@ -300,7 +307,7 @@ class TestLoaderPromptRefactor(unittest.TestCase):
             ComfySDStub(),
         ), mock.patch.object(loader_nodes, "comfy_core_nodes", CoreNodesStub()):
             node = loader_nodes.LLSSimpleCheckpointLoader()
-            model, text_encoder, vae, task_context = node.load_checkpoint(
+            model, clip, vae, task_context, text_encoder = node.load_checkpoint(
                 "sd15.safetensors",
                 "SD1.5",
                 "simple",
@@ -313,7 +320,9 @@ class TestLoaderPromptRefactor(unittest.TestCase):
             )
 
         self.assertEqual(model, "MODEL::SD15")
+        self.assertEqual(clip, "CLIP::SD15")
         self.assertEqual(text_encoder, "CLIP::SD15")
+        self.assertEqual(text_encoder, clip)
         self.assertEqual(vae, "VAE::SD15")
         self.assertEqual(task_context["resolved_model_family"], "SD1.5")
         self.assertEqual(task_context["checkpoint_name"], "sd15.safetensors")
@@ -335,7 +344,7 @@ class TestLoaderPromptRefactor(unittest.TestCase):
             ComfySDStub(),
         ), mock.patch.object(loader_nodes, "comfy_core_nodes", CoreNodesStub()):
             node = loader_nodes.LLSSimpleCheckpointLoader()
-            model, text_encoder, vae, task_context = node.load_checkpoint(
+            model, clip, vae, task_context, text_encoder = node.load_checkpoint(
                 "diffusion_models/flux1-schnell.safetensors",
                 "FLUX_SCHNELL",
                 "advanced",
@@ -348,7 +357,9 @@ class TestLoaderPromptRefactor(unittest.TestCase):
             )
 
         self.assertEqual(model, "MODEL::flux1-schnell.safetensors")
+        self.assertEqual(clip, "CLIP::flux::clip_l.safetensors+t5xxl_fp16.safetensors")
         self.assertEqual(text_encoder, "CLIP::flux::clip_l.safetensors+t5xxl_fp16.safetensors")
+        self.assertEqual(text_encoder, clip)
         self.assertEqual(vae, "VAE::ae.safetensors")
         self.assertEqual(task_context["resolved_model_family"], "FLUX_SCHNELL")
         self.assertEqual(task_context["text_encoder_type"], "flux_clip_l_t5xxl")

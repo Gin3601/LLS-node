@@ -355,18 +355,20 @@ class LLSSimpleCheckpointLoader:
     """
     统一封装的基础模型加载器。
 
-    真实输出结构为 model / text_encoder / vae / task_context。
-    text_encoder 端口类型使用 LLS_TEXT_ENCODER，内部承载 ComfyUI 的真实文本编码对象。
+    兼容输出结构为 model / clip / vae / task_context / text_encoder。
+    - `clip` 保留旧工作流需要的原生 CLIP 端口类型和位置。
+    - `text_encoder` 为新接口别名，内部承载同一个 ComfyUI 文本编码对象。
     """
 
     CATEGORY = "LLS/Model Loader"
     FUNCTION = "load_checkpoint"
-    RETURN_TYPES = ("MODEL", LLS_TEXT_ENCODER_TYPE, "VAE", LLS_TASK_CONTEXT_TYPE)
-    RETURN_NAMES = ("model", "text_encoder", "vae", "task_context")
+    RETURN_TYPES = ("MODEL", "CLIP", "VAE", LLS_TASK_CONTEXT_TYPE, LLS_TEXT_ENCODER_TYPE)
+    RETURN_NAMES = ("model", "clip", "vae", "task_context", "text_encoder")
     DESCRIPTION = (
         "Load SD1.5, SDXL, SDXL Turbo, and FLUX families with family-aware resource dispatch. "
         "Supports FLUX checkpoint-all-in-one mode and separated diffusion/text-encoder/VAE mode. "
-        "Writes the resolved loader state back into a unified task_context object."
+        "Preserves the legacy CLIP output for old workflows and writes the resolved loader state "
+        "back into a unified task_context object."
     )
 
     @classmethod
@@ -519,7 +521,7 @@ class LLSSimpleCheckpointLoader:
             **model_caps,
         )
 
-        return (model, text_encoder, vae, next_context)
+        return (model, text_encoder, vae, next_context, text_encoder)
 
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {
