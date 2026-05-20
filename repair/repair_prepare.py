@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .repair_utils import (
     build_canvas_info,
+    build_canvas_repair_mask,
     compute_crop_box,
     crop_image_to,
     crop_mask_to,
@@ -10,7 +11,9 @@ from .repair_utils import (
     get_image_size,
     get_mask_metrics,
     make_noise_mask,
+    merge_masks,
     normalize_model_info,
+    preprocess_mask,
     recommend_denoise,
     resize_image_to,
     resize_mask_to,
@@ -107,7 +110,7 @@ class LLSSimpleRepairPrepare:
         positive=None,
         negative=None,
     ):
-        del canvas_fill, positive, negative
+        del positive, negative
 
         if vae is None:
             raise RuntimeError("[LLS] Missing VAE for LLS Simple Repair Prepare.")
@@ -115,7 +118,15 @@ class LLSSimpleRepairPrepare:
         image_width, image_height = get_image_size(image)
         original_size = (image_width, image_height)
         normalized_model = normalize_model_info(model_info)
-        mask_bbox, mask_area_ratio = get_mask_metrics(mask, original_size)
+        processed_mask = preprocess_mask(
+            mask,
+            original_size,
+            invert_mask=bool(invert_mask),
+            mask_threshold=float(mask_threshold),
+            mask_grow=int(mask_grow),
+            mask_blur=float(mask_blur),
+        )
+        mask_bbox, mask_area_ratio = get_mask_metrics(processed_mask, original_size)
         canvas_expand = [
             max(0, int(expand_left)),
             max(0, int(expand_right)),
@@ -162,19 +173,23 @@ class LLSSimpleRepairPrepare:
             "model_family": normalized_model["model_family"],
             "model_role": normalized_model["model_role"],
             "repair_payload_version": "1.0",
-            "has_mask": mask_bbox is not None and mask_area_ratio > 0.0,
-            "mask_area_ratio": mask_area_ratio,
-            "mask_bbox": list(mask_bbox) if mask_bbox is not None else None,
+            "has_mask": False,
+            "mask_area_ratio": 0.0,
+            "mask_bbox": None,
             "warnings": warnings,
         }
 
         if effective_scope == "region":
             work_image = image
-            work_mask = resize_mask_to(mask, image_width, image_height)
+            work_mask = resize_mask_to(processed_mask, image_width, image_height)
             latent_samples = vae.encode(work_image)
             latent = {"samples": latent_samples, "source": "repair_prepare_region"}
             if effective_kernel == "latent_mask":
                 latent["noise_mask"] = make_noise_mask(work_mask, latent_samples)
+            final_bbox, final_area_ratio = get_mask_metrics(work_mask, original_size)
+            repair_info["has_mask"] = final_bbox is not None and final_area_ratio > 0.0
+            repair_info["mask_bbox"] = list(final_bbox) if final_bbox is not None else None
+            repair_info["mask_area_ratio"] = final_area_ratio
             return latent, work_image, work_mask, repair_info, recommended
 
         if effective_scope == "crop":
@@ -191,7 +206,7 @@ class LLSSimpleRepairPrepare:
                 resize_mode,
             )
             cropped_image = crop_image_to(image, crop_box)
-            cropped_mask = crop_mask_to(mask, crop_box)
+            cropped_mask = crop_mask_to(processed_mask, crop_box)
             work_image = resize_image_to(cropped_image, work_width, work_height)
             work_mask = resize_mask_to(cropped_mask, work_width, work_height)
             latent_samples = vae.encode(work_image)
@@ -202,6 +217,10 @@ class LLSSimpleRepairPrepare:
             repair_info["crop_box"] = list(crop_box)
             repair_info["crop_scale"] = crop_scale
             repair_info["work_size"] = (work_width, work_height)
+            final_bbox, final_area_ratio = get_mask_metrics(work_mask, (work_width, work_height))
+            repair_info["has_mask"] = final_bbox is not None and final_area_ratio > 0.0
+            repair_info["mask_bbox"] = list(final_bbox) if final_bbox is not None else None
+            repair_info["mask_area_ratio"] = final_area_ratio
             return latent, work_image, work_mask, repair_info, recommended
 
         if effective_scope == "canvas":
@@ -213,15 +232,38 @@ class LLSSimpleRepairPrepare:
                 int(expand_bottom),
             )
             work_width, work_height = canvas_info["work_size"]
-            work_image = expand_canvas_image(image, work_width, work_height)
-            work_mask = expand_canvas_mask(mask, work_width, work_height)
+            original_box = canvas_info["original_box"]
+            work_image = expand_canvas_image(
+                image,
+                work_width,
+                work_height,
+                fill_mode=canvas_fill,
+                original_box=original_box,
+            )
+            user_mask = expand_canvas_mask(
+                processed_mask,
+                work_width,
+                work_height,
+                original_box=original_box,
+            )
+            canvas_mask = build_canvas_repair_mask(
+                user_mask,
+                work_width,
+                work_height,
+                original_box=original_box,
+            )
+            work_mask = merge_masks(user_mask, canvas_mask, (work_width, work_height))
             latent_samples = vae.encode(work_image)
             latent = {"samples": latent_samples, "source": "repair_prepare_canvas"}
             if effective_kernel == "latent_mask":
                 latent["noise_mask"] = make_noise_mask(work_mask, latent_samples)
 
             repair_info["work_size"] = (work_width, work_height)
-            repair_info["original_box_in_canvas"] = list(canvas_info["original_box"])
+            repair_info["original_box_in_canvas"] = list(original_box)
+            final_bbox, final_area_ratio = get_mask_metrics(work_mask, (work_width, work_height))
+            repair_info["has_mask"] = final_bbox is not None and final_area_ratio > 0.0
+            repair_info["mask_bbox"] = list(final_bbox) if final_bbox is not None else None
+            repair_info["mask_area_ratio"] = final_area_ratio
             return latent, work_image, work_mask, repair_info, recommended
 
         raise RuntimeError(f"[LLS] Unsupported repair scope '{effective_scope}'.")

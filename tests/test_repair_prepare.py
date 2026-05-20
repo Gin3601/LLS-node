@@ -138,6 +138,56 @@ class TestRepairPrepare(unittest.TestCase):
         self.assertEqual(repair_info["canvas_expand"], [128, 0, 0, 0])
         self.assertEqual(recommended_denoise, 0.90)
         self.assertEqual(latent["source"], "repair_prepare_canvas")
+        self.assertGreater(work_mask.mask_area_ratio, 0.0)
+        self.assertTrue(repair_info["has_mask"])
+        self.assertIsNotNone(repair_info["mask_bbox"])
+        self.assertEqual(work_image.fill_mode, "edge")
+
+    def test_prepare_region_applies_mask_preprocessing_before_metrics(self):
+        plugin = load_plugin_package()
+        node = plugin.NODE_CLASS_MAPPINGS["LLSSimpleRepairPrepare"]()
+
+        image = FakeTensor((1, 512, 512, 3), label="preprocess-image")
+        mask = FakeMask(
+            (1, 512, 512),
+            mask_bbox=(200, 200, 280, 280),
+            mask_area_ratio=((280 - 200) * (280 - 200)) / float(512 * 512),
+            label="preprocess-mask",
+        )
+
+        _latent, _work_image, work_mask, repair_info, _recommended_denoise = node.prepare(
+            image=image,
+            mask=mask,
+            vae=FakeVAE(),
+            repair_scope="region",
+            repair_kernel="vae_inpaint",
+            task_hint="content",
+            mask_grow=24,
+            mask_blur=8.0,
+            mask_threshold=0.8,
+            invert_mask=False,
+            crop_context=64,
+            crop_context_factor=1.5,
+            min_size=256,
+            max_size=1024,
+            resize_mode="fit",
+            expand_left=0,
+            expand_right=0,
+            expand_top=0,
+            expand_bottom=0,
+            canvas_fill="edge",
+            auto_recommend="enabled",
+            model_info={"model_family": "SDXL", "model_role": "base"},
+        )
+
+        self.assertIn("normalize", work_mask.label)
+        self.assertIn("threshold[0.8]", work_mask.label)
+        self.assertIn("grow[24]", work_mask.label)
+        self.assertIn("blur[8.0]", work_mask.label)
+        self.assertNotEqual(work_mask.mask_bbox, mask.mask_bbox)
+        self.assertGreater(work_mask.mask_area_ratio, mask.mask_area_ratio)
+        self.assertEqual(repair_info["mask_bbox"], list(work_mask.mask_bbox))
+        self.assertEqual(repair_info["mask_area_ratio"], work_mask.mask_area_ratio)
 
     def test_prepare_requires_vae(self):
         plugin = load_plugin_package()

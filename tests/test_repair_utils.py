@@ -4,6 +4,11 @@ import pathlib
 import sys
 import unittest
 
+try:
+    from .test_repair_helpers import FakeMask
+except ImportError:  # pragma: no cover - discovery mode imports from top level
+    from test_repair_helpers import FakeMask
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MODULE_NAME = "lls_node_test_repair_utils"
@@ -215,6 +220,37 @@ class TestRepairUtils(unittest.TestCase):
         self.assertFalse(utils.normalize_repair_info({"invert_mask": "0"})["invert_mask"])
         self.assertTrue(utils.normalize_repair_info({"invert_mask": "true"})["invert_mask"])
         self.assertTrue(utils.normalize_repair_info({"invert_mask": 1})["invert_mask"])
+
+    def test_preprocess_mask_applies_requested_operations(self):
+        utils = load_repair_utils()
+
+        mask = FakeMask(
+            (1, 256, 256),
+            mask_bbox=(100, 100, 140, 140),
+            mask_area_ratio=((140 - 100) * (140 - 100)) / float(256 * 256),
+            label="preprocess-mask",
+        )
+        processed = utils.preprocess_mask(
+            mask,
+            (256, 256),
+            invert_mask=False,
+            mask_threshold=0.8,
+            mask_grow=12,
+            mask_blur=6.0,
+        )
+
+        self.assertIn("normalize", processed.label)
+        self.assertIn("threshold[0.8]", processed.label)
+        self.assertIn("grow[12]", processed.label)
+        self.assertIn("blur[6.0]", processed.label)
+        self.assertNotEqual(processed.mask_bbox, mask.mask_bbox)
+        self.assertGreater(processed.mask_area_ratio, mask.mask_area_ratio)
+
+    def test_normalize_repair_info_normalizes_original_box_in_canvas(self):
+        utils = load_repair_utils()
+
+        info = utils.normalize_repair_info({"original_box_in_canvas": ["8", 16, 128, 144]})
+        self.assertEqual(info["original_box_in_canvas"], (8, 16, 128, 144))
 
 
 if __name__ == "__main__":
