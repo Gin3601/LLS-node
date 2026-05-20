@@ -443,6 +443,98 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(payload["task_mode"], "txt2img")
         self.assertEqual(payload["batch_size"], 2)
 
+    def test_empty_latent_schema_accepts_optional_img2img_inputs(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimpleEmptyLatent"]
+        required = node_cls.INPUT_TYPES()["required"]
+        optional = node_cls.INPUT_TYPES()["optional"]
+
+        self.assertEqual(required["resize_mode"][0], ["keep_aspect", "crop_center", "stretch", "none"])
+        self.assertEqual(optional["image"][0], "IMAGE")
+        self.assertEqual(optional["vae"][0], "VAE")
+        self.assertEqual(optional["model"][0], "MODEL")
+
+    def test_empty_latent_can_encode_image_using_family_default_size(self):
+        load_plugin_package()
+        from lls_node_test_refactor.latent import nodes as latent_nodes
+        from lls_node_test_refactor.image import nodes as image_nodes
+
+        comfy_utils = FakeComfyUtils()
+        model = TaggedValue("MODEL::SDXL")
+        model._lls_family = "SDXL"
+        vae = FakeVAE(vae_name="embedded")
+
+        with mock.patch.object(image_nodes, "comfy_utils", comfy_utils):
+            node = latent_nodes.LLSSimpleEmptyLatent()
+            latent, width, height, latent_info = node.create_empty_latent(
+                "Family Default",
+                512,
+                512,
+                3,
+                model_family="Auto",
+                resize_mode="keep_aspect",
+                model=model,
+                image=FakeTensor((1, 768, 1536, 3)),
+                vae=vae,
+            )
+
+        payload = json.loads(latent_info)
+        self.assertEqual((width, height), (1024, 512))
+        self.assertEqual(tuple(latent["samples"].shape), (1, 4, 64, 128))
+        self.assertEqual(latent["downscale_ratio_spacial"], 8)
+        self.assertEqual(vae.encoded_shapes, [(1, 512, 1024, 3)])
+        self.assertEqual(payload["task_mode"], "img2img")
+        self.assertEqual(payload["latent_source"], "image_encode")
+        self.assertEqual(payload["model_family"], "SDXL")
+        self.assertEqual(payload["size_preset"], "Family Default")
+        self.assertEqual(payload["batch_size"], 1)
+
+    def test_empty_latent_can_encode_image_using_custom_size(self):
+        load_plugin_package()
+        from lls_node_test_refactor.latent import nodes as latent_nodes
+        from lls_node_test_refactor.image import nodes as image_nodes
+
+        comfy_utils = FakeComfyUtils()
+        vae = FakeVAE()
+
+        with mock.patch.object(image_nodes, "comfy_utils", comfy_utils):
+            node = latent_nodes.LLSSimpleEmptyLatent()
+            latent, width, height, latent_info = node.create_empty_latent(
+                "Custom",
+                640,
+                768,
+                4,
+                model_family="SD1.5",
+                resize_mode="stretch",
+                image=FakeTensor((1, 512, 512, 3)),
+                vae=vae,
+            )
+
+        payload = json.loads(latent_info)
+        self.assertEqual((width, height), (640, 768))
+        self.assertEqual(tuple(latent["samples"].shape), (1, 4, 96, 80))
+        self.assertEqual(vae.encoded_shapes, [(1, 768, 640, 3)])
+        self.assertEqual(payload["task_mode"], "img2img")
+        self.assertEqual(payload["size_preset"], "Custom")
+        self.assertEqual(payload["resize_mode"], "stretch")
+
+    def test_empty_latent_requires_vae_when_image_is_connected(self):
+        load_plugin_package()
+        from lls_node_test_refactor.latent import nodes as latent_nodes
+
+        node = latent_nodes.LLSSimpleEmptyLatent()
+
+        with self.assertRaisesRegex(RuntimeError, "Missing VAE"):
+            node.create_empty_latent(
+                "Custom",
+                640,
+                640,
+                1,
+                model_family="SD1.5",
+                resize_mode="stretch",
+                image=FakeTensor((1, 512, 512, 3)),
+            )
+
     def test_ksampler_reads_model_and_latent_inference_for_img2img(self):
         load_plugin_package()
         from lls_node_test_refactor.sampling import nodes as sampling_nodes
