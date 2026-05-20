@@ -71,6 +71,7 @@ _DEFAULT_SAMPLERS = ["euler", "euler_ancestral", "heun", "dpm_2", "dpm_2_ancestr
                      "lms", "dpm_fast", "dpm_adaptive", "dpmpp_2s_ancestral",
                      "dpmpp_sde", "dpmpp_2m", "dpmpp_2m_sde", "ddim", "uni_pc"]
 _DEFAULT_SCHEDULERS = ["normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform"]
+_PRIMITIVE_NUMBER_INPUT = "STRING,FLOAT,INT"
 
 
 def _get_samplers() -> list[str]:
@@ -89,6 +90,25 @@ def _get_schedulers() -> list[str]:
         except Exception:
             pass
     return _DEFAULT_SCHEDULERS
+
+
+def _normalize_flux_guidance(value, fallback: float | None) -> float | None:
+    if value is None:
+        return fallback
+    if isinstance(value, bool):
+        raise RuntimeError("[LLS] flux_guidance must be a number, not BOOLEAN.")
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return fallback
+        value = stripped
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(f"[LLS] Invalid flux_guidance value: {value!r}") from exc
+    if normalized < 0.0 or normalized > 100.0:
+        raise RuntimeError(f"[LLS] flux_guidance out of supported range [0.0, 100.0]: {normalized}")
+    return normalized
 
 
 def _common_ksampler(
@@ -216,12 +236,28 @@ class LLSSimpleKSampler:
                 "sampler_name": (_get_samplers(), {"default": "euler_ancestral"}),
                 "scheduler": (_get_schedulers(), {"default": "karras"}),
                 "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "flux_guidance": ("FLOAT", {"default": 3.5, "min": 0.0, "max": 100.0, "step": 0.1}),
+                "flux_guidance": (
+                    _PRIMITIVE_NUMBER_INPUT,
+                    {"default": 3.5, "widgetType": "FLOAT", "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.1},
+                ),
             },
             "optional": {
                 "task_context": (LLS_TASK_CONTEXT_TYPE,),
             },
         }
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, flux_guidance=None, input_types=None):
+        received_type = None
+        if isinstance(input_types, dict):
+            received_type = input_types.get("flux_guidance")
+        if received_type is not None and received_type not in {"STRING", "FLOAT", "INT"}:
+            return f"flux_guidance only accepts STRING/FLOAT/INT inputs, got {received_type}."
+        try:
+            _normalize_flux_guidance(flux_guidance, fallback=3.5)
+        except RuntimeError as exc:
+            return str(exc)
+        return True
 
     def sample(
         self,
@@ -236,7 +272,7 @@ class LLSSimpleKSampler:
         sampler_name: str,
         scheduler: str,
         denoise: float,
-        flux_guidance: float,
+        flux_guidance,
         task_context=None,
     ):
         if comfy_sample is None:
@@ -254,6 +290,9 @@ class LLSSimpleKSampler:
         info = parse_model_info(context)
         family = context.get("resolved_model_family") or info["family"]
         latent_source = latent_image.get("source") or context.get("latent_source")
+        default_flux_guidance = context.get("recommended_guidance")
+        if default_flux_guidance is None:
+            default_flux_guidance = info.get("guidance", info.get("default_guidance"))
         effective_task_mode = context.get("task_mode") or "txt2img"
         if latent_source == "empty_latent":
             effective_task_mode = "txt2img"
@@ -266,7 +305,7 @@ class LLSSimpleKSampler:
             sampler_name = str(context.get("recommended_sampler", sampler_name))
             scheduler = str(context.get("recommended_scheduler", scheduler))
             denoise = float(context.get("recommended_denoise", denoise))
-            context_guidance = context.get("recommended_guidance")
+            context_guidance = default_flux_guidance
             if context_guidance is not None:
                 flux_guidance = float(context_guidance)
         else:
@@ -279,6 +318,8 @@ class LLSSimpleKSampler:
                 denoise = float(preset["denoise"])
                 if preset.get("guidance") is not None:
                     flux_guidance = float(preset["guidance"])
+
+        flux_guidance = _normalize_flux_guidance(flux_guidance, fallback=default_flux_guidance)
 
         if is_flux_family(family) and context.get("supports_flux_guidance", True):
             guidance_value = flux_guidance

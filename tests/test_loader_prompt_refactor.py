@@ -572,6 +572,66 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(task_context["task_mode"], "img2img")
         self.assertEqual(task_context["denoise"], 0.5)
 
+    def test_ksampler_accepts_blank_flux_guidance_for_legacy_workflows(self):
+        load_plugin_package()
+        from lls_node_test_refactor.sampling import nodes as sampling_nodes
+
+        required = sampling_nodes.LLSSimpleKSampler.INPUT_TYPES()["required"]
+        flux_input_type, flux_input_opts = required["flux_guidance"]
+        self.assertEqual(flux_input_type, "STRING,FLOAT,INT")
+        self.assertEqual(flux_input_opts["widgetType"], "FLOAT")
+        self.assertTrue(sampling_nodes.LLSSimpleKSampler.VALIDATE_INPUTS(flux_guidance=""))
+
+        recorded = {}
+
+        def fake_common_ksampler(**kwargs):
+            recorded.update(kwargs)
+            return kwargs["latent"]
+
+        fake_node_helpers = types.SimpleNamespace(
+            conditioning_set_values=lambda conditioning, values: [{"conditioning": conditioning, **values}]
+        )
+        with mock.patch.object(sampling_nodes, "comfy_sample", object()), mock.patch.object(
+            sampling_nodes,
+            "comfy_samplers",
+            object(),
+        ), mock.patch.object(
+            sampling_nodes,
+            "_common_ksampler",
+            side_effect=fake_common_ksampler,
+        ), mock.patch.object(
+            sampling_nodes,
+            "node_helpers",
+            fake_node_helpers,
+        ):
+            node = sampling_nodes.LLSSimpleKSampler()
+            latent, sample_info, task_context = node.sample(
+                model="model",
+                positive=[["pos", {}]],
+                negative=[["neg", {}]],
+                latent_image={"samples": FakeTensor((1, 128, 64, 64)), "source": "empty_latent"},
+                quality_preset="Manual",
+                seed=123,
+                steps=20,
+                cfg=1.0,
+                sampler_name="euler",
+                scheduler="simple",
+                denoise=1.0,
+                flux_guidance="",
+                task_context={
+                    "resolved_model_family": "FLUX_DEV",
+                    "supports_flux_guidance": True,
+                    "recommended_guidance": 3.5,
+                },
+            )
+
+        sample_data = json.loads(sample_info)
+        self.assertEqual(recorded["positive"][0]["guidance"], 3.5)
+        self.assertEqual(recorded["negative"][0]["guidance"], 3.5)
+        self.assertEqual(sample_data["guidance"], 3.5)
+        self.assertEqual(task_context["guidance"], 3.5)
+        self.assertEqual(latent["samples"].shape, (1, 128, 64, 64))
+
     def test_vae_decode_updates_task_context_for_flux(self):
         plugin = load_plugin_package()
         node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimpleVAEDecode"]
