@@ -26,6 +26,18 @@ def load_repair_utils():
 
 
 class TestRepairUtils(unittest.TestCase):
+    def test_normalize_model_info_canonicalizes_legacy_family_aliases(self):
+        utils = load_repair_utils()
+
+        model_info = utils.normalize_model_info({"model_family": "SD15"})
+        self.assertEqual(model_info["model_family"], "SD1.5")
+
+    def test_canonicalized_family_feeds_sd_classic_adapter_resolution(self):
+        utils = load_repair_utils()
+
+        family = utils.normalize_model_info({"model_family": "SD15"})["model_family"]
+        self.assertEqual(utils.resolve_adapter_mode("auto", family), "sd_classic")
+
     def test_resolve_repair_scope_prefers_canvas_then_crop_then_region(self):
         utils = load_repair_utils()
 
@@ -157,6 +169,12 @@ class TestRepairUtils(unittest.TestCase):
         self.assertEqual(info["model_role"], "unknown")
         self.assertEqual(info["repair_payload_version"], "1.0")
         self.assertEqual(info["warnings"], [])
+
+    def test_normalize_repair_info_canonicalizes_family_fields(self):
+        utils = load_repair_utils()
+
+        info = utils.normalize_repair_info({"model_family": "SD15", "repair_scope": "region"})
+        self.assertEqual(info["model_family"], "SD1.5")
 
 
 if __name__ == "__main__":

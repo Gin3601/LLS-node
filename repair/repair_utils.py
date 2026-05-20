@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..utils.model_info import parse_jsonish_info
+from ..utils.model_info import canonicalize_family, parse_jsonish_info
 
 
 REPAIR_INFO_TYPE = "LLS_REPAIR_INFO"
@@ -37,8 +37,9 @@ _RESIZE_MODE_ALIASES = {
 
 def normalize_model_info(model_info: dict[str, Any] | str | None) -> dict[str, Any]:
     raw = parse_jsonish_info(model_info)
+    raw_family = raw.get("model_family") or raw.get("family")
     return {
-        "model_family": str(raw.get("model_family") or raw.get("family") or "UNKNOWN"),
+        "model_family": _normalize_model_family(raw_family),
         "model_role": str(raw.get("model_role") or raw.get("role") or "unknown"),
         "supports_inpaint_native": bool(raw.get("supports_inpaint_native", False)),
     }
@@ -62,7 +63,7 @@ def normalize_repair_info(repair_info: dict[str, Any] | str | None) -> dict[str,
     info["mask_threshold"] = _coerce_float(info.get("mask_threshold"), 0.5)
     info["invert_mask"] = bool(info.get("invert_mask", False))
     info["recommended_denoise"] = _coerce_float(info.get("recommended_denoise"), 0.55)
-    info["model_family"] = str(info.get("model_family") or model_info["model_family"])
+    info["model_family"] = _normalize_model_family(info.get("model_family") or model_info["model_family"])
     info["model_role"] = str(info.get("model_role") or model_info["model_role"])
     info["supports_inpaint_native"] = bool(
         info.get("supports_inpaint_native", model_info["supports_inpaint_native"])
@@ -251,7 +252,7 @@ def resolve_adapter_mode(adapter_mode: str, model_family: str) -> str:
     if mode != "auto":
         return mode
 
-    family = str(model_family or "")
+    family = _normalize_model_family(model_family)
     if family in {"SD1.5", "SDXL", "SDXL_TURBO"}:
         return "sd_classic"
     if family in {"FLUX", "FLUX_DEV", "FLUX_SCHNELL"}:
@@ -311,3 +312,10 @@ def _normalize_warning_list(value: Any) -> list[str]:
     if value in (None, ""):
         return []
     return [str(value)]
+
+
+def _normalize_model_family(value: Any) -> str:
+    if value in (None, ""):
+        return "UNKNOWN"
+    family = str(value)
+    return family if family == "UNKNOWN" else canonicalize_family(family)
