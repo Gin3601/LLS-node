@@ -45,6 +45,7 @@ _SUBPACKAGES: list[str] = [
     "qwen",           # 第 4 节：Qwen 一体化节点
     "latent",         # 第 4 节：Latent 空间操作
     "image",          # 第 5 节：图像处理与后处理
+    "repair",         # 第 5 节（修复子域）：图像修复
     "upscale",        # 第 5 节（超分子域）：图像超分
     "mask",           # 第 6 节：遮罩操作
     "controlnet",     # 第 7 节：ControlNet / 控制引导
