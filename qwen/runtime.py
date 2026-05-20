@@ -122,27 +122,10 @@ def _load_model_only_lora(model, lora_name: str, strength_model: float):
     return lora_loader_cls().load_lora_model_only(model, lora_name, float(strength_model))[0]
 
 
-def _apply_lora_stack(model, lora_stack):
-    if lora_stack is None:
+def _resolve_generation_model(model_name: str, model):
+    if model is not None:
         return model
-    if not isinstance(lora_stack, list):
-        raise RuntimeError("[LLS] Qwen lora_stack must be a list of LoRA entries.")
-
-    current_model = model
-    for index, entry in enumerate(lora_stack, start=1):
-        if not isinstance(entry, dict):
-            raise RuntimeError(f"[LLS] Invalid Qwen LoRA stack entry at position {index}.")
-
-        lora_name = discovery.validate_qwen_lora_name(str(entry.get("lora_name", "")))
-        try:
-            strength_model = float(entry.get("strength_model", 1.0))
-        except (TypeError, ValueError) as exc:
-            raise RuntimeError(
-                f"[LLS] Invalid strength_model in Qwen LoRA stack entry at position {index}."
-            ) from exc
-
-        current_model = _load_model_only_lora(current_model, lora_name, strength_model)
-    return current_model
+    return _load_qwen_model(model_name)
 
 
 def _prepare_turbo_request(resolver, model_name: str, steps: int, cfg: float, enable_turbo_mode: bool, turbo_lora_name: str):
@@ -264,7 +247,7 @@ def run_qwen_text_to_image(
     enable_turbo_mode: bool,
     turbo_lora_name: str,
     turbo_strength: float,
-    lora_stack=None,
+    model=None,
 ):
     try:
         model_name, clip_name, vae_name = _resolve_qwen_resources(
@@ -279,8 +262,7 @@ def run_qwen_text_to_image(
             enable_turbo_mode,
             turbo_lora_name,
         )
-        model = _load_qwen_model(model_name)
-        model = _apply_lora_stack(model, lora_stack)
+        model = _resolve_generation_model(model_name, model)
         if resolved_turbo_lora is not None:
             model = _load_model_only_lora(model, resolved_turbo_lora, float(turbo_strength))
         model = _patch_qwen_model_sampling(model, shift)
@@ -325,7 +307,7 @@ def run_qwen_image_edit(
     enable_turbo_mode: bool,
     turbo_lora_name: str,
     turbo_strength: float,
-    lora_stack=None,
+    model=None,
 ):
     try:
         if image is None:
@@ -343,8 +325,7 @@ def run_qwen_image_edit(
             enable_turbo_mode,
             turbo_lora_name,
         )
-        model = _load_qwen_model(model_name)
-        model = _apply_lora_stack(model, lora_stack)
+        model = _resolve_generation_model(model_name, model)
         if resolved_turbo_lora is not None:
             model = _load_model_only_lora(model, resolved_turbo_lora, float(turbo_strength))
         model = _patch_qwen_model_sampling(model, shift)

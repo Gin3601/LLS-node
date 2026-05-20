@@ -11,7 +11,6 @@ except Exception:
 
 TEXT_MODEL_PLACEHOLDER = "(no qwen text-to-image models found)"
 EDIT_MODEL_PLACEHOLDER = "(no qwen image edit models found)"
-NO_LORA_PLACEHOLDER = "(no loras found)"
 AUTO_TURBO_LORA_CHOICE = "(auto)"
 NO_TEXT_TURBO_LORA_PLACEHOLDER = "(no qwen text turbo loras found)"
 NO_EDIT_TURBO_LORA_PLACEHOLDER = "(no qwen edit turbo loras found)"
@@ -94,22 +93,6 @@ def validate_qwen_edit_model_name(model_name: str) -> str:
             f"[LLS] Model '{model_name}' is not compatible with LLSQwenImageEdit."
         )
     return model_name
-
-
-def get_qwen_lora_choices() -> list[str]:
-    names = _sorted_unique(_get_filename_list("loras"))
-    return names or [NO_LORA_PLACEHOLDER]
-
-
-def validate_qwen_lora_name(lora_name: str) -> str:
-    if not lora_name or lora_name == NO_LORA_PLACEHOLDER:
-        raise RuntimeError("[LLS] Missing Qwen LoRA selection.")
-    available = _get_filename_list("loras")
-    if lora_name not in available:
-        raise RuntimeError(
-            f"[LLS] LoRA '{lora_name}' was not found in ComfyUI/models/loras/."
-        )
-    return lora_name
 
 
 def is_qwen_text_turbo_lora(name: str | None) -> bool:

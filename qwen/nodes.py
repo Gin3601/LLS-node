@@ -14,48 +14,6 @@ except Exception:
     comfy_core_nodes = None
 
 _MAX_RESOLUTION = int(getattr(comfy_core_nodes, "MAX_RESOLUTION", 8192))
-_QWEN_LORA_STACK_TYPE = "LLS_QWEN_LORA_STACK"
-
-
-class LLSQwenLoRAStack:
-    CATEGORY = "LLS/Qwen"
-    FUNCTION = "build"
-    RETURN_TYPES = (_QWEN_LORA_STACK_TYPE,)
-    RETURN_NAMES = ("lora_stack",)
-    DESCRIPTION = (
-        "Builds an ordered model-side LoRA stack for the Qwen nodes. "
-        "Chain multiple nodes to apply multiple LoRAs serially."
-    )
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "lora_name": (discovery.get_qwen_lora_choices(),),
-                "strength_model": ("FLOAT", {"default": 1.0, "min": -100.0, "max": 100.0, "step": 0.01}),
-            },
-            "optional": {
-                "lora_stack": (_QWEN_LORA_STACK_TYPE,),
-            },
-        }
-
-    def build(self, lora_name: str, strength_model: float, lora_stack=None):
-        if not lora_name or lora_name == discovery.NO_LORA_PLACEHOLDER:
-            raise RuntimeError("[LLS] Missing Qwen LoRA selection.")
-
-        stack = []
-        if lora_stack is not None:
-            if not isinstance(lora_stack, list):
-                raise RuntimeError("[LLS] Qwen lora_stack must be a list.")
-            stack.extend(lora_stack)
-
-        stack.append(
-            {
-                "lora_name": str(lora_name),
-                "strength_model": float(strength_model),
-            }
-        )
-        return (stack,)
 
 
 class LLSQwenTextToImage:
@@ -64,8 +22,8 @@ class LLSQwenTextToImage:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
     DESCRIPTION = (
-        "Compressed Qwen text-to-image node. Internally loads the Qwen model, text encoder, "
-        "and VAE, supports advanced sampling controls, optional ordered LoRA stacks, "
+        "Compressed Qwen text-to-image node. Internally loads Qwen resources when needed, "
+        "supports advanced sampling controls, optional external MODEL chaining, "
         "and optional turbo/lightning LoRAs."
     )
 
@@ -90,10 +48,13 @@ class LLSQwenTextToImage:
                     discovery.get_qwen_text_turbo_lora_choices(),
                     {"default": discovery.AUTO_TURBO_LORA_CHOICE, "advanced": True},
                 ),
-                "turbo_strength": ("FLOAT", {"default": 1.0, "min": -100.0, "max": 100.0, "step": 0.01, "advanced": True}),
+                "turbo_strength": (
+                    "FLOAT",
+                    {"default": 1.0, "min": -100.0, "max": 100.0, "step": 0.01, "advanced": True},
+                ),
             },
             "optional": {
-                "lora_stack": (_QWEN_LORA_STACK_TYPE,),
+                "model": ("MODEL",),
             },
         }
 
@@ -114,7 +75,7 @@ class LLSQwenTextToImage:
         enable_turbo_mode: bool,
         turbo_lora_name: str,
         turbo_strength: float,
-        lora_stack=None,
+        model=None,
     ):
         return (
             runtime.run_qwen_text_to_image(
@@ -133,7 +94,7 @@ class LLSQwenTextToImage:
                 enable_turbo_mode=enable_turbo_mode,
                 turbo_lora_name=turbo_lora_name,
                 turbo_strength=turbo_strength,
-                lora_stack=lora_stack,
+                model=model,
             ),
         )
 
@@ -144,8 +105,8 @@ class LLSQwenImageEdit:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
     DESCRIPTION = (
-        "Compressed Qwen image-edit node. Internally loads the Qwen edit model, text encoder, "
-        "and VAE, supports official multi-image edit conditioning, ordered LoRA stacks, "
+        "Compressed Qwen image-edit node. Internally loads Qwen companion resources, "
+        "supports official multi-image edit conditioning, optional external MODEL chaining, "
         "and optional turbo/lightning LoRAs."
     )
 
@@ -173,12 +134,15 @@ class LLSQwenImageEdit:
                     discovery.get_qwen_edit_turbo_lora_choices(),
                     {"default": discovery.AUTO_TURBO_LORA_CHOICE, "advanced": True},
                 ),
-                "turbo_strength": ("FLOAT", {"default": 1.0, "min": -100.0, "max": 100.0, "step": 0.01, "advanced": True}),
+                "turbo_strength": (
+                    "FLOAT",
+                    {"default": 1.0, "min": -100.0, "max": 100.0, "step": 0.01, "advanced": True},
+                ),
             },
             "optional": {
                 "image2": ("IMAGE",),
                 "image3": ("IMAGE",),
-                "lora_stack": (_QWEN_LORA_STACK_TYPE,),
+                "model": ("MODEL",),
             },
         }
 
@@ -201,7 +165,7 @@ class LLSQwenImageEdit:
         enable_turbo_mode: bool = False,
         turbo_lora_name: str = discovery.AUTO_TURBO_LORA_CHOICE,
         turbo_strength: float = 1.0,
-        lora_stack=None,
+        model=None,
     ):
         return (
             runtime.run_qwen_image_edit(
@@ -222,19 +186,17 @@ class LLSQwenImageEdit:
                 enable_turbo_mode=enable_turbo_mode,
                 turbo_lora_name=turbo_lora_name,
                 turbo_strength=turbo_strength,
-                lora_stack=lora_stack,
+                model=model,
             ),
         )
 
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {
-    "LLSQwenLoRAStack": LLSQwenLoRAStack,
     "LLSQwenTextToImage": LLSQwenTextToImage,
     "LLSQwenImageEdit": LLSQwenImageEdit,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
-    "LLSQwenLoRAStack": "LLS Qwen LoRA Stack",
     "LLSQwenTextToImage": "LLS Qwen Text To Image",
     "LLSQwenImageEdit": "LLS Qwen Image Edit",
 }

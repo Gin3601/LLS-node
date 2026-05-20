@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Extend `LLSQwenTextToImage` and `LLSQwenImageEdit` with official/common advanced controls, optional ordered user LoRA stack input, optional turbo/lightning LoRA support, and full regression coverage while preserving the compressed single-node UX.
+**Goal:** Extend `LLSQwenTextToImage` and `LLSQwenImageEdit` with official/common advanced controls, an optional standard `MODEL` input compatible with `LoraLoaderModelOnly`, optional turbo/lightning LoRA support, and full regression coverage while preserving the compressed single-node UX.
 
-**Architecture:** Keep the current dedicated `qwen/` package and expand it in place. `qwen/discovery.py` will own advanced choice lists, ordered user LoRA choice lists, turbo LoRA filtering, auto-resolution, and turbo presets; `qwen/runtime.py` will own advanced parameter passthrough plus ordered model-only LoRA application; `qwen/nodes.py` will expose the expanded Qwen node schemas and add one compact `LLSQwenLoRAStack` helper while the main generation nodes still return only `IMAGE`.
+**Architecture:** Keep the current dedicated `qwen/` package and expand it in place. `qwen/discovery.py` will own turbo LoRA filtering, auto-resolution, and turbo presets; `qwen/runtime.py` will own advanced parameter passthrough plus internal-vs-external model selection; `qwen/nodes.py` will expose the expanded Qwen node schemas with optional `MODEL` inputs while the main generation nodes still return only `IMAGE`.
 
 **Tech Stack:** Python, unittest, ComfyUI core nodes, `comfy_extras.nodes_qwen`, `comfy_extras.nodes_flux`, `comfy_extras.nodes_model_advanced`, `comfy_extras.nodes_cfg`
 
@@ -13,26 +13,25 @@
 ## File Structure
 
 - Modify: `qwen/discovery.py`
-  - Add user LoRA stack choice lists, turbo/lightning LoRA discovery, `(auto)` handling, compatible LoRA validation, and turbo preset lookup.
+  - Keep turbo/lightning LoRA discovery, `(auto)` handling, compatible LoRA validation, and turbo preset lookup; remove now-unneeded custom LoRA-stack helpers.
 - Modify: `qwen/runtime.py`
-  - Add advanced parameter passthrough, ordered model-only user LoRA application, turbo preset overrides, and image-edit multi-reference handling.
+  - Add advanced parameter passthrough, external `MODEL` preference when connected, turbo preset overrides, and image-edit multi-reference handling.
 - Modify: `qwen/nodes.py`
-  - Expand the two public node schemas with advanced inputs, add optional `lora_stack` inputs, and add the compact `LLSQwenLoRAStack` helper while preserving hidden resource loading and `IMAGE`-only outputs.
+  - Expand the two public node schemas with advanced inputs, add optional `MODEL` inputs, and remove the custom `LLSQwenLoRAStack` helper while preserving hidden resource loading and `IMAGE`-only outputs.
 - Modify: `tests/test_qwen_nodes.py`
-  - Add schema, discovery, ordered LoRA stack, passthrough, turbo, and failure-path tests with small deterministic stubs.
+  - Replace custom LoRA-stack tests with schema, external `MODEL` passthrough, turbo, and failure-path tests with small deterministic stubs.
 
 ## Plan Amendment
 
 This plan now assumes two changes beyond the original draft:
 
-- both public Qwen generation nodes accept an optional ordered `lora_stack` input
+- both public Qwen generation nodes accept an optional standard `MODEL` input
 - `qwen_image_edit_2511_*` turbo/lightning support is allowed when a matching 2511 LoRA exists locally
 
-The intended internal model application order is:
+The intended model selection order is:
 
-- base Qwen model
-- ordered user LoRA stack entries
-- optional turbo/lightning LoRA
+- external path: use connected `MODEL`, then optionally apply turbo/lightning LoRA
+- internal path: load model from `model_name`, then optionally apply turbo/lightning LoRA
 
 ### Task 1: Expand schemas and turbo LoRA discovery
 
