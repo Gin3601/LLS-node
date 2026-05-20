@@ -42,6 +42,7 @@ _SUBPACKAGES: list[str] = [
     "model_loader",   # 第 1 节：模型加载与管理
     "conditioning",   # 第 2 节：文本编码与条件生成
     "sampling",       # 第 3 节：图像采样与去噪
+    "qwen",           # 第 4 节：Qwen 一体化节点
     "latent",         # 第 4 节：Latent 空间操作
     "image",          # 第 5 节：图像处理与后处理
     "upscale",        # 第 5 节（超分子域）：图像超分
