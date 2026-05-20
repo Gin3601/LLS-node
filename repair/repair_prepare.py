@@ -1,11 +1,24 @@
 from __future__ import annotations
 
 
-_REPAIR_SCOPE_CHOICES = ["masked_area", "bounding_box", "full_image"]
-_REPAIR_KERNEL_CHOICES = ["gaussian", "box", "dilate"]
-_TASK_HINT_CHOICES = ["general", "cleanup", "object_removal", "detail_fix"]
+_REPAIR_SCOPE_CHOICES = ["auto", "region", "crop", "canvas"]
+_REPAIR_KERNEL_CHOICES = ["auto", "latent_mask", "vae_inpaint", "native_fill"]
+_TASK_HINT_CHOICES = [
+    "auto",
+    "repair",
+    "remove",
+    "replace",
+    "fill",
+    "appearance",
+    "content",
+    "structure",
+    "dehaze",
+    "deshadow",
+    "recolor",
+]
 _RESIZE_MODE_CHOICES = ["fit", "pad", "stretch"]
-_CANVAS_FILL_CHOICES = ["original", "mask_mean", "solid"]
+_AUTO_RECOMMEND_CHOICES = ["enabled", "disabled"]
+_CANVAS_FILL_CHOICES = ["edge", "blur", "black", "white", "neutral"]
 
 
 class LLSSimpleRepairPrepare:
@@ -22,14 +35,14 @@ class LLSSimpleRepairPrepare:
                 "image": ("IMAGE",),
                 "mask": ("MASK",),
                 "vae": ("VAE",),
-                "repair_scope": (_REPAIR_SCOPE_CHOICES, {"default": "masked_area"}),
-                "repair_kernel": (_REPAIR_KERNEL_CHOICES, {"default": "gaussian"}),
-                "task_hint": (_TASK_HINT_CHOICES, {"default": "general"}),
+                "repair_scope": (_REPAIR_SCOPE_CHOICES, {"default": "auto"}),
+                "repair_kernel": (_REPAIR_KERNEL_CHOICES, {"default": "auto"}),
+                "task_hint": (_TASK_HINT_CHOICES, {"default": "auto"}),
                 "mask_grow": ("INT", {"default": 24, "min": 0, "max": 2048, "step": 1}),
                 "mask_blur": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 256.0, "step": 0.5}),
                 "mask_threshold": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "invert_mask": ("BOOLEAN", {"default": False}),
-                "crop_context": ("BOOLEAN", {"default": True}),
+                "crop_context": ("INT", {"default": 64, "min": 0, "max": 512}),
                 "crop_context_factor": ("FLOAT", {"default": 1.5, "min": 1.0, "max": 8.0, "step": 0.1}),
                 "min_size": ("INT", {"default": 256, "min": 64, "max": 8192, "step": 8}),
                 "max_size": ("INT", {"default": 1024, "min": 64, "max": 8192, "step": 8}),
@@ -38,8 +51,8 @@ class LLSSimpleRepairPrepare:
                 "expand_right": ("INT", {"default": 0, "min": 0, "max": 4096, "step": 1}),
                 "expand_top": ("INT", {"default": 0, "min": 0, "max": 4096, "step": 1}),
                 "expand_bottom": ("INT", {"default": 0, "min": 0, "max": 4096, "step": 1}),
-                "canvas_fill": (_CANVAS_FILL_CHOICES, {"default": "original"}),
-                "auto_recommend": ("BOOLEAN", {"default": True}),
+                "canvas_fill": (_CANVAS_FILL_CHOICES, {"default": "edge"}),
+                "auto_recommend": (_AUTO_RECOMMEND_CHOICES, {"default": "enabled"}),
             },
             "optional": {
                 "model_info": ("STRING",),

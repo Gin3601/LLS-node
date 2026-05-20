@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 
-_EDGE_FIX_CHOICES = ["off", "feather", "color_blend"]
-_PREVIEW_MODE_CHOICES = ["final", "preview", "split"]
+_COLOR_MATCH_CHOICES = ["disabled", "mean_std", "histogram_simple"]
+_BRIGHTNESS_MATCH_CHOICES = ["disabled", "enabled"]
+_EDGE_FIX_CHOICES = ["none", "soft", "strong"]
+_PREVIEW_MODE_CHOICES = ["final", "compare", "mask", "before_after"]
 
 
 class LLSSimpleRepairFinish:
@@ -20,11 +22,11 @@ class LLSSimpleRepairFinish:
                 "generated_image": ("IMAGE",),
                 "repair_info": ("LLS_REPAIR_INFO",),
                 "feather": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 256.0, "step": 0.5}),
-                "color_match": ("BOOLEAN", {"default": True}),
-                "brightness_match": ("BOOLEAN", {"default": True}),
+                "color_match": (_COLOR_MATCH_CHOICES, {"default": "disabled"}),
+                "brightness_match": (_BRIGHTNESS_MATCH_CHOICES, {"default": "enabled"}),
                 "blend_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "restore_unmasked_area": ("BOOLEAN", {"default": True}),
-                "edge_fix": (_EDGE_FIX_CHOICES, {"default": "feather"}),
+                "edge_fix": (_EDGE_FIX_CHOICES, {"default": "soft"}),
                 "preview_mode": (_PREVIEW_MODE_CHOICES, {"default": "final"}),
             },
             "optional": {

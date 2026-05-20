@@ -1,6 +1,9 @@
 import unittest
 
-from test_repair_helpers import load_plugin_package
+try:
+    from .test_repair_helpers import load_plugin_package
+except ImportError:  # pragma: no cover - discovery mode imports from top level
+    from test_repair_helpers import load_plugin_package
 
 
 class TestRepairRegistration(unittest.TestCase):
@@ -28,6 +31,10 @@ class TestRepairRegistration(unittest.TestCase):
         self.assertEqual(
             node_cls.RETURN_TYPES,
             ("LATENT", "IMAGE", "MASK", "LLS_REPAIR_INFO", "FLOAT"),
+        )
+        self.assertEqual(
+            node_cls.RETURN_NAMES,
+            ("latent", "work_image", "work_mask", "repair_info", "recommended_denoise"),
         )
 
         required = schema["required"]
@@ -60,6 +67,51 @@ class TestRepairRegistration(unittest.TestCase):
 
         for field in ("model_info", "positive", "negative"):
             self.assertIn(field, optional)
+        self.assertEqual(required["image"], ("IMAGE",))
+        self.assertEqual(required["mask"], ("MASK",))
+        self.assertEqual(required["vae"], ("VAE",))
+        self.assertEqual(optional["model_info"], ("STRING",))
+        self.assertEqual(optional["positive"], ("CONDITIONING",))
+        self.assertEqual(optional["negative"], ("CONDITIONING",))
+        self.assertEqual(
+            required["repair_scope"],
+            (["auto", "region", "crop", "canvas"], {"default": "auto"}),
+        )
+        self.assertEqual(
+            required["repair_kernel"],
+            (["auto", "latent_mask", "vae_inpaint", "native_fill"], {"default": "auto"}),
+        )
+        self.assertEqual(
+            required["task_hint"],
+            (
+                [
+                    "auto",
+                    "repair",
+                    "remove",
+                    "replace",
+                    "fill",
+                    "appearance",
+                    "content",
+                    "structure",
+                    "dehaze",
+                    "deshadow",
+                    "recolor",
+                ],
+                {"default": "auto"},
+            ),
+        )
+        self.assertEqual(
+            required["crop_context"],
+            ("INT", {"default": 64, "min": 0, "max": 512}),
+        )
+        self.assertEqual(
+            required["auto_recommend"],
+            (["enabled", "disabled"], {"default": "enabled"}),
+        )
+        self.assertEqual(
+            required["canvas_fill"],
+            (["edge", "blur", "black", "white", "neutral"], {"default": "edge"}),
+        )
 
     def test_finish_node_schema(self):
         plugin = load_plugin_package()
@@ -69,6 +121,7 @@ class TestRepairRegistration(unittest.TestCase):
         self.assertEqual(node_cls.CATEGORY, "LLS/Image Repair")
         self.assertEqual(node_cls.FUNCTION, "finish")
         self.assertEqual(node_cls.RETURN_TYPES, ("IMAGE", "IMAGE"))
+        self.assertEqual(node_cls.RETURN_NAMES, ("final_image", "preview_image"))
 
         required = schema["required"]
         optional = schema["optional"]
@@ -89,6 +142,27 @@ class TestRepairRegistration(unittest.TestCase):
 
         for field in ("work_mask", "sample_info"):
             self.assertIn(field, optional)
+        self.assertEqual(required["original_image"], ("IMAGE",))
+        self.assertEqual(required["generated_image"], ("IMAGE",))
+        self.assertEqual(required["repair_info"], ("LLS_REPAIR_INFO",))
+        self.assertEqual(optional["work_mask"], ("MASK",))
+        self.assertEqual(optional["sample_info"], ("STRING",))
+        self.assertEqual(
+            required["color_match"],
+            (["disabled", "mean_std", "histogram_simple"], {"default": "disabled"}),
+        )
+        self.assertEqual(
+            required["brightness_match"],
+            (["disabled", "enabled"], {"default": "enabled"}),
+        )
+        self.assertEqual(
+            required["edge_fix"],
+            (["none", "soft", "strong"], {"default": "soft"}),
+        )
+        self.assertEqual(
+            required["preview_mode"],
+            (["final", "compare", "mask", "before_after"], {"default": "final"}),
+        )
 
 
 if __name__ == "__main__":
