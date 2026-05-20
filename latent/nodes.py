@@ -93,8 +93,8 @@ class LLSSimpleEmptyLatent:
                 "width": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 8}),
                 "height": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 8}),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
-                "resize_mode": (_RESIZE_MODES, {"default": "keep_aspect"}),
                 "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
+                "resize_mode": (_RESIZE_MODES, {"default": "keep_aspect"}),
             },
             "optional": {
                 "model": ("MODEL",),

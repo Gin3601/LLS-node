@@ -449,6 +449,17 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         required = node_cls.INPUT_TYPES()["required"]
         optional = node_cls.INPUT_TYPES()["optional"]
 
+        self.assertEqual(
+            tuple(required.keys()),
+            (
+                "size_preset",
+                "width",
+                "height",
+                "batch_size",
+                "model_family",
+                "resize_mode",
+            ),
+        )
         self.assertEqual(required["resize_mode"][0], ["keep_aspect", "crop_center", "stretch", "none"])
         self.assertEqual(optional["image"][0], "IMAGE")
         self.assertEqual(optional["vae"][0], "VAE")
