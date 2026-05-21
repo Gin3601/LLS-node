@@ -19,7 +19,7 @@ class TestRepairPrepare(unittest.TestCase):
             label="region-mask",
         )
 
-        latent, work_image, work_mask, repair_info, recommended_denoise = node.prepare(
+        latent, work_image, work_mask, repair_info, recommended_denoise, positive, negative = node.prepare(
             image=image,
             mask=mask,
             vae=FakeVAE(),
@@ -50,6 +50,8 @@ class TestRepairPrepare(unittest.TestCase):
         self.assertEqual(repair_info["repair_scope"], "region")
         self.assertEqual(repair_info["repair_kernel"], "latent_mask")
         self.assertEqual(recommended_denoise, 0.45)
+        self.assertIsNone(positive)
+        self.assertIsNone(negative)
 
     def test_prepare_crop_with_vae_inpaint_populates_crop_metadata(self):
         plugin = load_plugin_package()
@@ -63,7 +65,7 @@ class TestRepairPrepare(unittest.TestCase):
             label="crop-mask",
         )
 
-        latent, work_image, work_mask, repair_info, recommended_denoise = node.prepare(
+        latent, work_image, work_mask, repair_info, recommended_denoise, positive, negative = node.prepare(
             image=image,
             mask=mask,
             vae=FakeVAE(),
@@ -99,6 +101,8 @@ class TestRepairPrepare(unittest.TestCase):
         self.assertIn(":crop[", work_mask.label)
         self.assertEqual(work_image.crop_box, tuple(repair_info["crop_box"]))
         self.assertEqual(work_mask.crop_box, tuple(repair_info["crop_box"]))
+        self.assertIsNone(positive)
+        self.assertIsNone(negative)
 
     def test_prepare_canvas_with_vae_inpaint_supports_empty_mask(self):
         plugin = load_plugin_package()
@@ -107,7 +111,7 @@ class TestRepairPrepare(unittest.TestCase):
         image = FakeTensor((1, 640, 640, 3), label="canvas-image")
         mask = FakeMask((1, 640, 640), mask_bbox=None, mask_area_ratio=0.0, label="canvas-mask")
 
-        latent, work_image, work_mask, repair_info, recommended_denoise = node.prepare(
+        latent, work_image, work_mask, repair_info, recommended_denoise, positive, negative = node.prepare(
             image=image,
             mask=mask,
             vae=FakeVAE(),
@@ -142,6 +146,8 @@ class TestRepairPrepare(unittest.TestCase):
         self.assertTrue(repair_info["has_mask"])
         self.assertIsNotNone(repair_info["mask_bbox"])
         self.assertEqual(work_image.fill_mode, "edge")
+        self.assertIsNone(positive)
+        self.assertIsNone(negative)
 
     def test_prepare_region_applies_mask_preprocessing_before_metrics(self):
         plugin = load_plugin_package()
@@ -155,7 +161,7 @@ class TestRepairPrepare(unittest.TestCase):
             label="preprocess-mask",
         )
 
-        _latent, _work_image, work_mask, repair_info, _recommended_denoise = node.prepare(
+        _latent, _work_image, work_mask, repair_info, _recommended_denoise, _positive, _negative = node.prepare(
             image=image,
             mask=mask,
             vae=FakeVAE(),
@@ -188,6 +194,45 @@ class TestRepairPrepare(unittest.TestCase):
         self.assertGreater(work_mask.mask_area_ratio, mask.mask_area_ratio)
         self.assertEqual(repair_info["mask_bbox"], list(work_mask.mask_bbox))
         self.assertEqual(repair_info["mask_area_ratio"], work_mask.mask_area_ratio)
+
+    def test_prepare_passthroughs_positive_and_negative_outputs(self):
+        plugin = load_plugin_package()
+        node = plugin.NODE_CLASS_MAPPINGS["LLSSimpleRepairPrepare"]()
+
+        image = FakeTensor((1, 512, 512, 3), label="passthrough-image")
+        mask = FakeMask((1, 512, 512), mask_bbox=(64, 64, 128, 128), mask_area_ratio=0.02)
+        positive = [["pos", {"strength": 1.0}]]
+        negative = [["neg", {"strength": 1.0}]]
+
+        _latent, _work_image, _work_mask, _repair_info, _recommended_denoise, positive_out, negative_out = node.prepare(
+            image=image,
+            mask=mask,
+            vae=FakeVAE(),
+            repair_scope="region",
+            repair_kernel="latent_mask",
+            task_hint="repair",
+            mask_grow=24,
+            mask_blur=8.0,
+            mask_threshold=0.5,
+            invert_mask=False,
+            crop_context=64,
+            crop_context_factor=1.5,
+            min_size=256,
+            max_size=1024,
+            resize_mode="fit",
+            expand_left=0,
+            expand_right=0,
+            expand_top=0,
+            expand_bottom=0,
+            canvas_fill="edge",
+            auto_recommend="enabled",
+            model_info={"model_family": "SDXL", "model_role": "base"},
+            positive=positive,
+            negative=negative,
+        )
+
+        self.assertIs(positive_out, positive)
+        self.assertIs(negative_out, negative)
 
     def test_prepare_requires_vae(self):
         plugin = load_plugin_package()

@@ -80,15 +80,86 @@ node/
 
 `LLS-node` 现在提供一套面向本地工作流的修复链路，由以下节点组成：
 
+- `LLS Simple Mask Draw`
 - `LLS Simple Repair Prepare`
 - `LLS Simple KSampler`
 - `LLS Simple Repair Finish`
 
 修复工作流不是从 `LLS Simple Empty Latent` 开始，而是从 `image + mask + vae` 开始。`LLS Simple Repair Prepare` 会把这些输入转换为带有 `repair_info` 的修复态 latent，再交给同一个 `LLS Simple KSampler` 继续采样。
 
+### `LLS Simple Mask Draw`
+
+`LLS Simple Mask Draw` 是一个面向局部重绘的交互式遮罩输入节点，用来直接在输入图像上手动画 `mask`，并把结果输出给后续修复链路。
+
+**推荐工作流：**
+
+- `Load Image -> LLS Simple Mask Draw -> Preview Image`
+- `Load Image -> LLS Simple Mask Draw -> LLS Simple Repair Prepare`
+
+**推荐连接方式：**
+
+- `Load Image.image -> LLS Simple Mask Draw.image`
+- `LLS Simple Mask Draw.image -> LLS Simple Repair Prepare.image`
+- `LLS Simple Mask Draw.mask -> LLS Simple Repair Prepare.mask`
+
+**输入：**
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| `image` | `IMAGE` | 必填，原图输入 |
+| `input_mask` | `MASK` | 可选，已有遮罩；节点会在这个遮罩基础上继续编辑 |
+
+**输出：**
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| `image` | `IMAGE` | 原图透传 |
+| `mask` | `MASK` | 最终遮罩，白色 / `1` 表示要重绘，黑色 / `0` 表示不重绘 |
+| `preview_image` | `IMAGE` | 原图与半透明红色遮罩叠加后的预览图 |
+
+**当前支持的交互功能：**
+
+- 直接在图像上绘制白色遮罩
+- `brush` / `erase` 两种模式
+- 调整 `brush_size`
+- 调整 `brush_softness`
+- 调整 `overlay_alpha`
+- 预览半透明红色遮罩叠加
+- `Clear`
+- `Undo`
+- `Redo`
+- `Invert`
+- 在已有 `input_mask` 基础上继续补画或擦除
+
+**如何手动画 mask：**
+
+1. 连接 `Load Image` 到 `LLS Simple Mask Draw.image`
+2. 如果有已有遮罩，可再连接到 `input_mask`
+3. 在节点预览区域直接涂抹需要修复的区域
+4. 用 `erase` 擦除不需要重绘的部分
+5. 用 `Clear / Undo / Redo / Invert` 调整最终结果
+6. 将 `mask` 输出接到 `LLS Simple Repair Prepare.mask`
+
+**典型用途：**
+
+- 手动指定删除区域
+- 手动指定修复区域
+- 手动指定去阴影区域
+- 手动指定局部增强区域
+
+**当前版本限制：**
+
+- 第一版只支持 `brush` 和 `erase`
+- 还没有实现 `polygon`、`rectangle`、`ellipse`
+- 还没有实现魔棒、自动分割、智能抠图
+
 ### Minimal Repair Workflow
 
 `Load Image -> Load Mask -> LLS Simple Checkpoint Loader -> LLS Simple Prompt Encode -> LLS Simple Repair Prepare -> LLS Simple KSampler -> VAE Decode -> LLS Simple Repair Finish -> Preview Image`
+
+### Minimal Manual Mask Workflow
+
+`Load Image -> LLS Simple Mask Draw -> LLS Simple Repair Prepare -> LLS Simple KSampler -> VAE Decode -> LLS Simple Repair Finish -> Preview Image`
 
 ### `repair_scope`
 

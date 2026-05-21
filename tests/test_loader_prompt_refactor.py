@@ -593,7 +593,7 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(sample_data["sampler_name"], "euler")
         self.assertEqual(latent["samples"].shape, (1, 4, 64, 64))
 
-    def test_ksampler_schema_appends_model_family_after_legacy_widgets(self):
+    def test_ksampler_schema_appends_repair_widgets_after_legacy_widgets(self):
         plugin = load_plugin_package()
         node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimpleKSampler"]
         required = node_cls.INPUT_TYPES()["required"]
@@ -612,10 +612,10 @@ class TestLoaderPromptRefactor(unittest.TestCase):
                 "sampler_name",
                 "scheduler",
                 "denoise",
-                "denoise_mode",
-                "adapter_mode",
                 "flux_guidance",
                 "model_family",
+                "denoise_mode",
+                "adapter_mode",
             ),
         )
         self.assertEqual(required["model_family"][1]["default"], "Auto")

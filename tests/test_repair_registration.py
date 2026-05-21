@@ -30,11 +30,11 @@ class TestRepairRegistration(unittest.TestCase):
         self.assertEqual(node_cls.FUNCTION, "prepare")
         self.assertEqual(
             node_cls.RETURN_TYPES,
-            ("LATENT", "IMAGE", "MASK", "LLS_REPAIR_INFO", "FLOAT"),
+            ("LATENT", "IMAGE", "MASK", "LLS_REPAIR_INFO", "FLOAT", "CONDITIONING", "CONDITIONING"),
         )
         self.assertEqual(
             node_cls.RETURN_NAMES,
-            ("latent", "work_image", "work_mask", "repair_info", "recommended_denoise"),
+            ("latent", "work_image", "work_mask", "repair_info", "recommended_denoise", "positive", "negative"),
         )
 
         required = schema["required"]

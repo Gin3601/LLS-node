@@ -36,6 +36,8 @@ from __future__ import annotations
 import importlib
 import types
 
+WEB_DIRECTORY = "./web"
+
 # ---------- 子包白名单（控制加载顺序，同时作为文档） ----------
 # 按功能分类总览章节顺序排列；新增子包追加到列表末尾即可。
 _SUBPACKAGES: list[str] = [
@@ -46,6 +48,7 @@ _SUBPACKAGES: list[str] = [
     "latent",         # 第 4 节：Latent 空间操作
     "image",          # 第 5 节：图像处理与后处理
     "repair",         # 第 5 节（修复子域）：图像修复
+    "mask_draw",      # 第 5 节（修复子域）：交互式遮罩绘制
     "upscale",        # 第 5 节（超分子域）：图像超分
     "mask",           # 第 6 节：遮罩操作
     "controlnet",     # 第 7 节：ControlNet / 控制引导
@@ -121,4 +124,4 @@ _merge_root_nodes(NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS)
 for _pkg in _SUBPACKAGES:
     _merge_subpackage(_pkg, NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS)
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

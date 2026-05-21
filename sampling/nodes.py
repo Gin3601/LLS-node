@@ -240,13 +240,13 @@ class LLSSimpleKSampler:
                 "sampler_name": (_get_samplers(), {"default": "euler_ancestral"}),
                 "scheduler": (_get_schedulers(), {"default": "karras"}),
                 "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "denoise_mode": (_DENOISE_MODE_CHOICES, {"default": "manual"}),
-                "adapter_mode": (_ADAPTER_MODE_CHOICES, {"default": "auto"}),
                 "flux_guidance": (
                     _PRIMITIVE_NUMBER_INPUT,
                     {"default": 3.5, "widgetType": "FLOAT", "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.1},
                 ),
                 "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
+                "denoise_mode": (_DENOISE_MODE_CHOICES, {"default": "manual"}),
+                "adapter_mode": (_ADAPTER_MODE_CHOICES, {"default": "auto"}),
             },
             "optional": {
                 "repair_info": ("LLS_REPAIR_INFO",),

@@ -46,8 +46,8 @@ _CANVAS_FILL_CHOICES = ["edge", "blur", "black", "white", "neutral"]
 class LLSSimpleRepairPrepare:
     CATEGORY = "LLS/Image Repair"
     FUNCTION = "prepare"
-    RETURN_TYPES = ("LATENT", "IMAGE", "MASK", "LLS_REPAIR_INFO", "FLOAT")
-    RETURN_NAMES = ("latent", "work_image", "work_mask", "repair_info", "recommended_denoise")
+    RETURN_TYPES = ("LATENT", "IMAGE", "MASK", "LLS_REPAIR_INFO", "FLOAT", "CONDITIONING", "CONDITIONING")
+    RETURN_NAMES = ("latent", "work_image", "work_mask", "repair_info", "recommended_denoise", "positive", "negative")
     DESCRIPTION = "Prepare repair inputs, work area, and repair metadata."
 
     @classmethod
@@ -110,8 +110,6 @@ class LLSSimpleRepairPrepare:
         positive=None,
         negative=None,
     ):
-        del positive, negative
-
         if vae is None:
             raise RuntimeError("[LLS] Missing VAE for LLS Simple Repair Prepare.")
 
@@ -190,7 +188,7 @@ class LLSSimpleRepairPrepare:
             repair_info["has_mask"] = final_bbox is not None and final_area_ratio > 0.0
             repair_info["mask_bbox"] = list(final_bbox) if final_bbox is not None else None
             repair_info["mask_area_ratio"] = final_area_ratio
-            return latent, work_image, work_mask, repair_info, recommended
+            return latent, work_image, work_mask, repair_info, recommended, positive, negative
 
         if effective_scope == "crop":
             if mask_bbox is None or mask_area_ratio <= 0.0:
@@ -221,7 +219,7 @@ class LLSSimpleRepairPrepare:
             repair_info["has_mask"] = final_bbox is not None and final_area_ratio > 0.0
             repair_info["mask_bbox"] = list(final_bbox) if final_bbox is not None else None
             repair_info["mask_area_ratio"] = final_area_ratio
-            return latent, work_image, work_mask, repair_info, recommended
+            return latent, work_image, work_mask, repair_info, recommended, positive, negative
 
         if effective_scope == "canvas":
             canvas_info = build_canvas_info(
@@ -264,7 +262,7 @@ class LLSSimpleRepairPrepare:
             repair_info["has_mask"] = final_bbox is not None and final_area_ratio > 0.0
             repair_info["mask_bbox"] = list(final_bbox) if final_bbox is not None else None
             repair_info["mask_area_ratio"] = final_area_ratio
-            return latent, work_image, work_mask, repair_info, recommended
+            return latent, work_image, work_mask, repair_info, recommended, positive, negative
 
         raise RuntimeError(f"[LLS] Unsupported repair scope '{effective_scope}'.")
 
