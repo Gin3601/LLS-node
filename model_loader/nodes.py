@@ -36,6 +36,7 @@ else:
 
 from ..utils.model_info import (
     MODEL_FAMILY_CHOICES,
+    build_model_info,
     canonicalize_family,
     get_family_defaults,
     infer_family_from_name,
@@ -58,6 +59,20 @@ _FLUX_T5_PATTERNS = ("t5xxl_fp8_e4m3fn.safetensors", "t5xxl_fp16.safetensors", "
 _SDXL_CLIP_L_PATTERNS = ("clip_l.safetensors", "clip_l", "clip-l")
 _SDXL_CLIP_G_PATTERNS = ("clip_g.safetensors", "clip_g", "clip-g")
 _FLUX_VAE_PATTERNS = ("ae.safetensors", "ae", "vae")
+
+
+def _build_capability_tags(model_name: str, family: str) -> dict[str, object]:
+    info = build_model_info(
+        checkpoint_name=model_name,
+        model_name=model_name,
+        family=family,
+    )
+    return {
+        "model_role": info["model_role"],
+        "supports_inpaint_native": info["supports_inpaint_native"],
+        "supports_image_edit_native": info["supports_image_edit_native"],
+        "preferred_edit_backend": info["preferred_edit_backend"],
+    }
 
 
 def _get_filename_list(category: str) -> list[str]:
@@ -432,6 +447,7 @@ class LLSSimpleCheckpointLoader:
         )
 
         defaults = get_family_defaults(family)
+        capability_tags = _build_capability_tags(ckpt_name, family)
         resolved_text_encoder_name = resolved_te_1 or ("embedded" if text_encoder is not None else None)
         resolved_text_encoder_name_1 = resolved_te_1 or ("embedded" if text_encoder is not None and not resolved_te_2 else None)
         resolved_text_encoder_name_2 = resolved_te_2
@@ -445,6 +461,7 @@ class LLSSimpleCheckpointLoader:
             model_name=ckpt_name,
             checkpoint_name=ckpt_name,
             load_mode=load_mode,
+            **capability_tags,
         )
         tag_lls_object(
             text_encoder,
@@ -456,6 +473,7 @@ class LLSSimpleCheckpointLoader:
             text_encoder_name=resolved_text_encoder_name,
             text_encoder_name_1=resolved_text_encoder_name_1,
             text_encoder_name_2=resolved_text_encoder_name_2,
+            **capability_tags,
         )
         tag_lls_object(
             vae,
@@ -464,6 +482,7 @@ class LLSSimpleCheckpointLoader:
             checkpoint_name=ckpt_name,
             vae_name=resolved_vae_label,
             vae_source=resolved_vae_source,
+            **capability_tags,
         )
 
         return (model, text_encoder, vae, text_encoder)

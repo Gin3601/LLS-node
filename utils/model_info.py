@@ -193,6 +193,15 @@ SAMPLING_PRESETS: dict[str, dict[str, dict[str, float | int | None]]] = {
 }
 
 _LEGACY_MODEL_INFO_PATTERN = re.compile(r"(\w+)=([^|]+)")
+_ROLE_KEYWORDS = (
+    ("inpaint", "inpaint"),
+    ("img2img", "edit"),
+    ("imageedit", "edit"),
+    ("image-edit", "edit"),
+    ("edit", "edit"),
+    ("fill", "fill"),
+    ("refiner", "refiner"),
+)
 
 
 def canonicalize_family(family: str | None) -> str:
@@ -277,20 +286,87 @@ def _coerce_scalar(value: Any) -> Any:
         return value
 
 
+def _coerce_bool(value: Any) -> bool:
+    coerced = _coerce_scalar(value)
+    if isinstance(coerced, str):
+        return bool(coerced)
+    return bool(coerced)
+
+
+def _get_model_name_alias_value(info: dict[str, Any]) -> Any:
+    return (
+        info.get("checkpoint_name")
+        or info.get("model_name")
+        or info.get("ckpt_name")
+        or info.get("ckpt")
+    )
+
+
+def infer_model_role_from_name(model_name: str | None, family: str | None = None) -> str:
+    del family
+    name = str(model_name or "").lower()
+    for needle, role in _ROLE_KEYWORDS:
+        if needle in name:
+            return role
+    return "base"
+
+
+def infer_edit_capabilities(model_name: str | None, family: str | None = None) -> dict[str, Any]:
+    resolved_family = canonicalize_family(family or infer_family_from_name(model_name, "SD1.5"))
+    role = infer_model_role_from_name(model_name, resolved_family)
+
+    supports_inpaint_native = False
+    supports_image_edit_native = False
+    preferred_edit_backend = None
+
+    if is_sdxl_family(resolved_family):
+        preferred_edit_backend = "sdxl" if role in {"inpaint", "edit", "fill"} else None
+        supports_inpaint_native = role in {"inpaint", "edit", "fill"}
+        supports_image_edit_native = role in {"edit", "fill"}
+    elif is_flux_family(resolved_family):
+        preferred_edit_backend = "flux" if role in {"inpaint", "edit", "fill"} else None
+        supports_inpaint_native = role == "inpaint"
+        supports_image_edit_native = role in {"inpaint", "edit", "fill"}
+
+    return {
+        "model_role": role,
+        "supports_inpaint_native": supports_inpaint_native,
+        "supports_image_edit_native": supports_image_edit_native,
+        "preferred_edit_backend": preferred_edit_backend,
+    }
+
+
 def parse_model_info(model_info: dict[str, Any] | str | None) -> dict[str, Any]:
     raw = parse_jsonish_info(model_info)
+    raw_model_name = _get_model_name_alias_value(raw)
     family = canonicalize_family(
         raw.get("family")
+        or raw.get("model_family")
         or infer_family_from_name(
-            raw.get("checkpoint_name") or raw.get("model_name") or raw.get("ckpt_name") or raw.get("ckpt"),
+            raw_model_name,
             "SD1.5",
         )
     )
     defaults = get_family_defaults(family)
+    capability_defaults = infer_edit_capabilities(
+        raw_model_name,
+        family,
+    )
 
     info: dict[str, Any] = {**defaults}
     info.update(raw)
     info["family"] = family
+    info["model_role"] = str(raw.get("model_role", capability_defaults["model_role"]))
+    info["supports_inpaint_native"] = _coerce_bool(
+        raw.get("supports_inpaint_native", capability_defaults["supports_inpaint_native"])
+    )
+    info["supports_image_edit_native"] = _coerce_bool(
+        raw.get("supports_image_edit_native", capability_defaults["supports_image_edit_native"])
+    )
+    info["preferred_edit_backend"] = raw.get(
+        "preferred_edit_backend",
+        capability_defaults["preferred_edit_backend"],
+    )
     info["text_encoder_type"] = raw.get("text_encoder_type", defaults["text_encoder_type"])
     required_text_encoders = raw.get("required_text_encoders", defaults["required_text_encoders"])
     if isinstance(required_text_encoders, str):
@@ -324,8 +400,9 @@ def parse_model_info(model_info: dict[str, Any] | str | None) -> dict[str, Any]:
         f"{info['default_width']}x{info['default_height']}",
     )
 
-    info.setdefault("checkpoint_name", raw.get("checkpoint_name") or raw.get("model_name") or "")
+    info.setdefault("checkpoint_name", raw_model_name or "")
     info.setdefault("model_name", info["checkpoint_name"])
+    info["model_family"] = family
     info.setdefault("vae_source", raw.get("vae_source", "auto"))
     info.setdefault("text_encoder_source", raw.get("text_encoder_source", "auto"))
     info.setdefault("load_mode", raw.get("load_mode", "simple"))
@@ -434,6 +511,63 @@ def get_lls_attr(obj, name: str, default: Any = None) -> Any:
         return default
     attr_name = name if name.startswith("_lls_") else f"_lls_{name}"
     return getattr(obj, attr_name, default)
+
+
+def resolve_edit_capabilities(model=None, model_info: dict[str, Any] | str | None = None) -> dict[str, Any]:
+    raw = parse_jsonish_info(model_info)
+    info = parse_model_info(model_info)
+    raw_model_name = _get_model_name_alias_value(raw)
+    model_name = str(
+        raw_model_name
+        or info.get("checkpoint_name")
+        or info.get("model_name")
+        or get_lls_attr(model, "model_name", "")
+        or ""
+    )
+    family = canonicalize_family(
+        raw.get("family")
+        or raw.get("model_family")
+        or get_lls_attr(model, "family", None)
+        or info.get("family")
+        or info.get("model_family")
+        or infer_family_from_model(model)
+    )
+    inferred = infer_edit_capabilities(model_name, family)
+    return {
+        "model_family": family,
+        "model_name": model_name,
+        "model_role": str(
+            raw.get("model_role")
+            or get_lls_attr(model, "model_role", None)
+            or info.get("model_role")
+            or inferred["model_role"]
+        ),
+        "supports_inpaint_native": _coerce_bool(
+            raw.get(
+                "supports_inpaint_native",
+                get_lls_attr(
+                    model,
+                    "supports_inpaint_native",
+                    info.get("supports_inpaint_native", inferred["supports_inpaint_native"]),
+                ),
+            )
+        ),
+        "supports_image_edit_native": _coerce_bool(
+            raw.get(
+                "supports_image_edit_native",
+                get_lls_attr(
+                    model,
+                    "supports_image_edit_native",
+                    info.get("supports_image_edit_native", inferred["supports_image_edit_native"]),
+                ),
+            )
+        ),
+        "preferred_edit_backend": (
+            raw.get("preferred_edit_backend")
+            or get_lls_attr(model, "preferred_edit_backend", inferred["preferred_edit_backend"])
+            or info.get("preferred_edit_backend")
+        ),
+    }
 
 
 def resolve_model_family(

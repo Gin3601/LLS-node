@@ -49,6 +49,7 @@ _SUBPACKAGES: list[str] = [
     "image",          # 第 5 节：图像处理与后处理
     "repair",         # 第 5 节（修复子域）：图像修复
     "mask_draw",      # 第 5 节（修复子域）：交互式遮罩绘制
+    "pro_edit",       # 第 5 节（专业编辑子域）：图像编辑/重绘
     "upscale",        # 第 5 节（超分子域）：图像超分
     "mask",           # 第 6 节：遮罩操作
     "controlnet",     # 第 7 节：ControlNet / 控制引导

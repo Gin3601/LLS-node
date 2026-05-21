@@ -186,6 +186,59 @@ node/
 
 ---
 
+## Pro Image Edit / Inpaint
+
+`LLS-node` 也提供一套更严格的专业局部编辑链路，针对真正支持原生 image edit / inpaint 语义的模型：
+
+- `LLS Pro Image Edit Prepare`
+- `LLS Pro KSampler Bridge`
+- `LLS Pro Image Edit Finish`
+
+### Simple vs Pro
+
+- `Simple = lightweight masked latent resampling`
+- `Pro = true image edit / inpaint pipeline`
+
+当模型本身具备真实的局部编辑能力，而且你更在意遮罩区域内的提示词跟随和原生 inpaint / image-edit 行为时，用 `Pro` 链；如果你只是需要兼容性更高、约束更少的局部重绘流程，继续使用 `Simple` 链。
+
+### Professional Workflow
+
+`Load Image -> Load Mask or LLS Simple Mask Draw -> LLS Simple Checkpoint Loader -> LLS Simple Prompt Encode -> LLS Pro Image Edit Prepare -> LLS Pro KSampler Bridge -> VAE Decode -> LLS Pro Image Edit Finish -> Preview Image`
+
+### Backend Selection
+
+- `backend_mode = auto | sdxl | flux`
+- `auto` 会根据 capability metadata 自动路由，找不到专业后端时直接报错，不会静默降级到旧的 Simple repair 逻辑
+- `sdxl` 和 `flux` 会强制指定后端，但仍然会验证当前模型是否兼容
+
+### Capability Requirements
+
+- `model_role`
+- `supports_inpaint_native`
+- `supports_image_edit_native`
+- `preferred_edit_backend`
+
+这些字段可以来自：
+
+- `model_info`
+- `LLS Simple Checkpoint Loader` 写入到对象上的 `_lls_*` 元信息
+- `utils/model_info.py` 里的 family / name 推断逻辑
+
+### Adding new professional edit models
+
+1. 在 `utils/model_info.py` 里补充或修正角色与 capability 推断规则
+2. 确认 `LLS Simple Checkpoint Loader` 会把正确的 `_lls_*` capability tags 写到 `model` / `clip` / `vae`
+3. 优先用 `backend_mode=auto` 验证 capability metadata 是否足以自动识别
+4. 调试阶段可临时改用 `backend_mode=sdxl` 或 `backend_mode=flux`，快速确认显式路由是否匹配预期
+
+### Notes
+
+- `LLSSimple*` 修复链保持不变，不会被这套新链覆盖
+- `LLS Pro Image Edit Finish` 负责真实的区域混合、裁剪回贴和扩图 canvas 合成
+- `LLS Pro KSampler Bridge` 支持 `denoise_mode = manual | auto_from_edit`
+
+---
+
 ## 扩展节点
 
 在对应子包的 `nodes.py` 中添加节点类并注册到 `NODE_CLASS_MAPPINGS`，重启 ComfyUI 自动生效。
