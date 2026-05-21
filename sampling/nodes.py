@@ -116,6 +116,42 @@ def _normalize_flux_guidance(value, fallback: float | None) -> float | None:
     return normalized
 
 
+def _normalize_ksampler_compat_values(
+    denoise_mode,
+    adapter_mode,
+    flux_guidance,
+    model_family,
+):
+    normalized_denoise_mode = str(denoise_mode or "").strip()
+    normalized_flux_guidance = str(flux_guidance or "").strip()
+    normalized_adapter_mode = str(adapter_mode or "").strip()
+    normalized_model_family = str(model_family or "").strip()
+
+    # Repair the short-lived widget-order regression so old and newly re-saved
+    # workflows can both be interpreted correctly.
+    if (
+        normalized_denoise_mode not in _DENOISE_MODE_CHOICES
+        and normalized_flux_guidance in _DENOISE_MODE_CHOICES
+        and normalized_model_family.lower() in _ADAPTER_MODE_CHOICES
+    ):
+        shifted_flux_guidance = denoise_mode
+        denoise_mode = normalized_flux_guidance or "manual"
+        adapter_mode = normalized_model_family.lower() or "auto"
+        flux_guidance = shifted_flux_guidance
+        model_family = "Auto" if normalized_adapter_mode.lower() == "auto" else normalized_adapter_mode
+        return denoise_mode, adapter_mode, flux_guidance, model_family
+
+    if normalized_adapter_mode.lower() in _ADAPTER_MODE_CHOICES:
+        adapter_mode = normalized_adapter_mode.lower()
+    elif normalized_adapter_mode == "Auto":
+        adapter_mode = "auto"
+
+    if normalized_model_family == "auto":
+        model_family = "Auto"
+
+    return denoise_mode, adapter_mode, flux_guidance, model_family
+
+
 def _common_ksampler(
     model,
     seed: int,
@@ -240,13 +276,13 @@ class LLSSimpleKSampler:
                 "sampler_name": (_get_samplers(), {"default": "euler_ancestral"}),
                 "scheduler": (_get_schedulers(), {"default": "karras"}),
                 "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "denoise_mode": (_DENOISE_MODE_CHOICES, {"default": "manual"}),
+                "adapter_mode": (_ADAPTER_MODE_CHOICES, {"default": "auto"}),
                 "flux_guidance": (
                     _PRIMITIVE_NUMBER_INPUT,
                     {"default": 3.5, "widgetType": "FLOAT", "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.1},
                 ),
                 "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
-                "denoise_mode": (_DENOISE_MODE_CHOICES, {"default": "manual"}),
-                "adapter_mode": (_ADAPTER_MODE_CHOICES, {"default": "auto"}),
             },
             "optional": {
                 "repair_info": ("LLS_REPAIR_INFO",),
@@ -302,6 +338,12 @@ class LLSSimpleKSampler:
 
         repair_meta = normalize_repair_info(repair_info) if repair_info is not None else None
         model_meta = normalize_model_info(model_info)
+        denoise_mode, adapter_mode, flux_guidance, model_family = _normalize_ksampler_compat_values(
+            denoise_mode,
+            adapter_mode,
+            flux_guidance,
+            model_family,
+        )
 
         family = resolve_model_family(model_family, model=model)
         if repair_meta is not None and repair_meta.get("model_family") not in {"UNKNOWN", "", None}:

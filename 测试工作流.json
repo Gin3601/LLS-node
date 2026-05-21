@@ -1,0 +1,1531 @@
+{
+  "id": "196d3f49-c541-4fcd-b800-ad54aecdf346",
+  "revision": 0,
+  "last_node_id": 50,
+  "last_link_id": 62,
+  "nodes": [
+    {
+      "id": 28,
+      "type": "VAEDecode",
+      "pos": [
+        1580.7609512068045,
+        -386.4355276097807
+      ],
+      "size": [
+        140,
+        46
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 30
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 31
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            32
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 29,
+      "type": "LLSUpscaleSwitcher",
+      "pos": [
+        1564.4477163435238,
+        -280.275527609781
+      ],
+      "size": [
+        270,
+        198
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 32
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            33
+          ]
+        },
+        {
+          "name": "upscale_info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "3e97537f543c74db0e91a840d698105c5f269931",
+        "Node name for S&R": "LLSUpscaleSwitcher"
+      },
+      "widgets_values": [
+        "interpolation",
+        2,
+        "bilinear",
+        "(no upscale models found)",
+        512,
+        32
+      ]
+    },
+    {
+      "id": 10,
+      "type": "PreviewImage",
+      "pos": [
+        1879.409164205428,
+        -405.28809919995183
+      ],
+      "size": [
+        258.545487837358,
+        331.33331298828125
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 33
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 21,
+      "type": "LLSSimpleCheckpointLoader",
+      "pos": [
+        433.0723885292493,
+        -357.18940539520315
+      ],
+      "size": [
+        303.159765625,
+        286
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            25,
+            36
+          ]
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            40
+          ]
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "links": [
+            31,
+            37
+          ]
+        },
+        {
+          "name": "text_encoder",
+          "type": "CLIP",
+          "links": [
+            41
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "3e97537f543c74db0e91a840d698105c5f269931",
+        "Node name for S&R": "LLSSimpleCheckpointLoader"
+      },
+      "widgets_values": [
+        "flux1-schnell-fp8.safetensors",
+        "Auto",
+        "simple",
+        "auto",
+        "auto",
+        "(auto)",
+        "(auto)",
+        "(auto)"
+      ]
+    },
+    {
+      "id": 31,
+      "type": "LLSSimpleEmptyLatent",
+      "pos": [
+        810.3695674177421,
+        -688.5215513219393
+      ],
+      "size": [
+        270,
+        238
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": 36
+        },
+        {
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 39
+        },
+        {
+          "name": "vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": 37
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            38
+          ]
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "latent_info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "15fb6920931aa6c502dd40976a2bd5fb1514c27a",
+        "Node name for S&R": "LLSSimpleEmptyLatent"
+      },
+      "widgets_values": [
+        "Family Default",
+        512,
+        512,
+        1,
+        "Auto",
+        "keep_aspect"
+      ]
+    },
+    {
+      "id": 30,
+      "type": "LoadImage",
+      "pos": [
+        433.0080499616882,
+        -734.3942620458165
+      ],
+      "size": [
+        270,
+        314
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            39
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 34,
+      "type": "LLSQwenImageEdit",
+      "pos": [
+        1592.9390229661215,
+        69.29028563341905
+      ],
+      "size": [
+        400,
+        534
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 43
+        },
+        {
+          "name": "image2",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "image3",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": null
+        },
+        {
+          "name": "lora_stack",
+          "shape": 7,
+          "type": "LLS_QWEN_LORA_STACK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            44
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "1d481c0dc75cac2cd1342012971f82a39792e83e",
+        "Node name for S&R": "LLSQwenImageEdit"
+      },
+      "widgets_values": [
+        "(no qwen image edit models found)",
+        "",
+        20,
+        661366653803666,
+        "randomize",
+        "",
+        4,
+        "euler",
+        "simple",
+        3.1,
+        1,
+        "index_timestep_zero",
+        false,
+        "(auto)",
+        1
+      ]
+    },
+    {
+      "id": 23,
+      "type": "LLSSimplePromptEncode",
+      "pos": [
+        774.4544228864921,
+        -326.3542439183741
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "text_encoder",
+          "shape": 7,
+          "type": "CLIP",
+          "link": 40
+        },
+        {
+          "name": "clip",
+          "shape": 7,
+          "type": "CLIP",
+          "link": 41
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            26
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            27
+          ]
+        },
+        {
+          "name": "prompt_info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "3e97537f543c74db0e91a840d698105c5f269931",
+        "Node name for S&R": "LLSSimplePromptEncode"
+      },
+      "widgets_values": [
+        "cat\n",
+        "",
+        -1,
+        "Auto"
+      ]
+    },
+    {
+      "id": 25,
+      "type": "LLSSimpleKSampler",
+      "pos": [
+        1251.2977114607115,
+        -523.7621248998194
+      ],
+      "size": [
+        270,
+        446
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 25
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 26
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 27
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 38
+        },
+        {
+          "name": "repair_info",
+          "shape": 7,
+          "type": "LLS_REPAIR_INFO",
+          "link": null
+        },
+        {
+          "name": "guidance_stack",
+          "shape": 7,
+          "type": "LLS_GUIDANCE_STACK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            30
+          ]
+        },
+        {
+          "name": "sample_info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "3e97537f543c74db0e91a840d698105c5f269931",
+        "Node name for S&R": "LLSSimpleKSampler"
+      },
+      "widgets_values": [
+        "Family Default",
+        887303760569149,
+        "randomize",
+        20,
+        7,
+        "euler_ancestral",
+        "karras",
+        1,
+        3.5,
+        "Auto",
+        3.5,
+        "Auto",
+        ""
+      ]
+    },
+    {
+      "id": 32,
+      "type": "LLSQwenTextToImage",
+      "pos": [
+        723.5861328843849,
+        78.56194147786306
+      ],
+      "size": [
+        400,
+        498
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": null
+        },
+        {
+          "name": "lora_stack",
+          "shape": 7,
+          "type": "LLS_QWEN_LORA_STACK",
+          "link": 45
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            42
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "1d481c0dc75cac2cd1342012971f82a39792e83e",
+        "Node name for S&R": "LLSQwenTextToImage"
+      },
+      "widgets_values": [
+        "qwen_image_fp8_e4m3fn.safetensors",
+        "CAT",
+        1024,
+        1024,
+        20,
+        236805929055807,
+        "randomize",
+        1,
+        "",
+        4,
+        "euler",
+        "simple",
+        3.1,
+        false,
+        "(auto)",
+        1
+      ]
+    },
+    {
+      "id": 35,
+      "type": "LoadImage",
+      "pos": [
+        1287.4303710057327,
+        67.9100923991409
+      ],
+      "size": [
+        270,
+        314
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            43
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 36,
+      "type": "PreviewImage",
+      "pos": [
+        2013.8828021217575,
+        70.5195091149048
+      ],
+      "size": [
+        140,
+        26
+      ],
+      "flags": {
+        "collapsed": false
+      },
+      "order": 13,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 44
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 38,
+      "type": "LLSQwenLoRAStack",
+      "pos": [
+        430.7382413862913,
+        84.28211107685348
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "lora_stack",
+          "shape": 7,
+          "type": "LLS_QWEN_LORA_STACK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "lora_stack",
+          "type": "LLS_QWEN_LORA_STACK",
+          "links": [
+            45
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "ce6ac6b0d4efc263e1d38b64bdd11aa8629a21bf",
+        "Node name for S&R": "LLSQwenLoRAStack"
+      },
+      "widgets_values": [
+        "(no loras found)",
+        1
+      ]
+    },
+    {
+      "id": 47,
+      "type": "VAEDecode",
+      "pos": [
+        1825.9733979514097,
+        1053.3741446628553
+      ],
+      "size": [
+        140,
+        46
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 56
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 57
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            58
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 48,
+      "type": "PreviewImage",
+      "pos": [
+        2028.5545027912408,
+        1063.1862769831923
+      ],
+      "size": [
+        140,
+        26
+      ],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 58
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 33,
+      "type": "PreviewImage",
+      "pos": [
+        1138.0580854156797,
+        77.42985108631
+      ],
+      "size": [
+        140,
+        246
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 42
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 41,
+      "type": "LLSSimpleRepairFinish",
+      "pos": [
+        1834.253738230468,
+        700.4561136191923
+      ],
+      "size": [
+        298.25,
+        286
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "original_image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "generated_image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "repair_info",
+          "type": "LLS_REPAIR_INFO",
+          "link": null
+        },
+        {
+          "name": "work_mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "preview_image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "3fb0ca37ca5c434470439faee80ef4248f133d92",
+        "Node name for S&R": "LLSSimpleRepairFinish"
+      },
+      "widgets_values": [
+        8,
+        "disabled",
+        "enabled",
+        1,
+        true,
+        "soft",
+        "final",
+        ""
+      ]
+    },
+    {
+      "id": 42,
+      "type": "LoadImage",
+      "pos": [
+        836.8916577534524,
+        694.5567621363803
+      ],
+      "size": [
+        270,
+        314
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            46
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            59
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "LoadImage",
+        "image": "clipspace/clipspace-painted-masked-1779342854818.png [input]"
+      },
+      "widgets_values": [
+        "clipspace/clipspace-painted-masked-1779342854818.png [input]",
+        "image"
+      ]
+    },
+    {
+      "id": 45,
+      "type": "LLSSimpleCheckpointLoader",
+      "pos": [
+        435.4678768213653,
+        703.7324463283629
+      ],
+      "size": [
+        303.159765625,
+        286
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            52
+          ]
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            47
+          ]
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "links": [
+            49,
+            57
+          ]
+        },
+        {
+          "name": "text_encoder",
+          "type": "CLIP",
+          "links": [
+            48
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "3e97537f543c74db0e91a840d698105c5f269931",
+        "Node name for S&R": "LLSSimpleCheckpointLoader"
+      },
+      "widgets_values": [
+        "flux1-schnell-fp8.safetensors",
+        "Auto",
+        "simple",
+        "auto",
+        "auto",
+        "(auto)",
+        "(auto)",
+        "(auto)"
+      ]
+    },
+    {
+      "id": 44,
+      "type": "LLSSimplePromptEncode",
+      "pos": [
+        414.4659924164017,
+        1032.2056031054838
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text_encoder",
+          "shape": 7,
+          "type": "CLIP",
+          "link": 47
+        },
+        {
+          "name": "clip",
+          "shape": 7,
+          "type": "CLIP",
+          "link": 48
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            50
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            51
+          ]
+        },
+        {
+          "name": "prompt_info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "3e97537f543c74db0e91a840d698105c5f269931",
+        "Node name for S&R": "LLSSimplePromptEncode"
+      },
+      "widgets_values": [
+        "在桌子上面添加一只猫",
+        "",
+        -1,
+        "Auto"
+      ]
+    },
+    {
+      "id": 40,
+      "type": "LLSSimpleRepairPrepare",
+      "pos": [
+        1146.7837663241448,
+        689.6573348009558
+      ],
+      "size": [
+        286.025390625,
+        610
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 46
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 59
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 49
+        },
+        {
+          "name": "positive",
+          "shape": 7,
+          "type": "CONDITIONING",
+          "link": 50
+        },
+        {
+          "name": "negative",
+          "shape": 7,
+          "type": "CONDITIONING",
+          "link": 51
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            53
+          ]
+        },
+        {
+          "name": "work_image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "work_mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "name": "repair_info",
+          "type": "LLS_REPAIR_INFO",
+          "links": [
+            60
+          ]
+        },
+        {
+          "name": "recommended_denoise",
+          "type": "FLOAT",
+          "links": null
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            61
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            62
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "3fb0ca37ca5c434470439faee80ef4248f133d92",
+        "Node name for S&R": "LLSSimpleRepairPrepare"
+      },
+      "widgets_values": [
+        "auto",
+        "auto",
+        "auto",
+        24,
+        8,
+        0.5,
+        false,
+        64,
+        1.5,
+        256,
+        1024,
+        "fit",
+        0,
+        0,
+        0,
+        0,
+        "edge",
+        "enabled",
+        ""
+      ]
+    },
+    {
+      "id": 46,
+      "type": "LLSSimpleKSampler",
+      "pos": [
+        1501.7649997487804,
+        716.6535325802862
+      ],
+      "size": [
+        270,
+        446
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 52
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 61
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 62
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 53
+        },
+        {
+          "name": "repair_info",
+          "shape": 7,
+          "type": "LLS_REPAIR_INFO",
+          "link": 60
+        },
+        {
+          "name": "guidance_stack",
+          "shape": 7,
+          "type": "LLS_GUIDANCE_STACK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            56
+          ]
+        },
+        {
+          "name": "sample_info",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "3e97537f543c74db0e91a840d698105c5f269931",
+        "Node name for S&R": "LLSSimpleKSampler"
+      },
+      "widgets_values": [
+        "Family Default",
+        887303760569149,
+        "randomize",
+        20,
+        7,
+        "euler_ancestral",
+        "karras",
+        1,
+        3.5,
+        "Auto",
+        3.5,
+        "Auto",
+        ""
+      ]
+    }
+  ],
+  "links": [
+    [
+      25,
+      21,
+      0,
+      25,
+      0,
+      "MODEL"
+    ],
+    [
+      26,
+      23,
+      0,
+      25,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      27,
+      23,
+      1,
+      25,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      30,
+      25,
+      0,
+      28,
+      0,
+      "LATENT"
+    ],
+    [
+      31,
+      21,
+      2,
+      28,
+      1,
+      "VAE"
+    ],
+    [
+      32,
+      28,
+      0,
+      29,
+      0,
+      "IMAGE"
+    ],
+    [
+      33,
+      29,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      36,
+      21,
+      0,
+      31,
+      0,
+      "MODEL"
+    ],
+    [
+      37,
+      21,
+      2,
+      31,
+      2,
+      "VAE"
+    ],
+    [
+      38,
+      31,
+      0,
+      25,
+      3,
+      "LATENT"
+    ],
+    [
+      39,
+      30,
+      0,
+      31,
+      1,
+      "IMAGE"
+    ],
+    [
+      40,
+      21,
+      1,
+      23,
+      0,
+      "CLIP"
+    ],
+    [
+      41,
+      21,
+      3,
+      23,
+      1,
+      "CLIP"
+    ],
+    [
+      42,
+      32,
+      0,
+      33,
+      0,
+      "IMAGE"
+    ],
+    [
+      43,
+      35,
+      0,
+      34,
+      0,
+      "IMAGE"
+    ],
+    [
+      44,
+      34,
+      0,
+      36,
+      0,
+      "IMAGE"
+    ],
+    [
+      45,
+      38,
+      0,
+      32,
+      1,
+      "LLS_QWEN_LORA_STACK"
+    ],
+    [
+      46,
+      42,
+      0,
+      40,
+      0,
+      "IMAGE"
+    ],
+    [
+      47,
+      45,
+      1,
+      44,
+      0,
+      "CLIP"
+    ],
+    [
+      48,
+      45,
+      3,
+      44,
+      1,
+      "CLIP"
+    ],
+    [
+      49,
+      45,
+      2,
+      40,
+      2,
+      "VAE"
+    ],
+    [
+      50,
+      44,
+      0,
+      40,
+      3,
+      "CONDITIONING"
+    ],
+    [
+      51,
+      44,
+      1,
+      40,
+      4,
+      "CONDITIONING"
+    ],
+    [
+      52,
+      45,
+      0,
+      46,
+      0,
+      "MODEL"
+    ],
+    [
+      53,
+      40,
+      0,
+      46,
+      3,
+      "LATENT"
+    ],
+    [
+      56,
+      46,
+      0,
+      47,
+      0,
+      "LATENT"
+    ],
+    [
+      57,
+      45,
+      2,
+      47,
+      1,
+      "VAE"
+    ],
+    [
+      58,
+      47,
+      0,
+      48,
+      0,
+      "IMAGE"
+    ],
+    [
+      59,
+      42,
+      1,
+      40,
+      1,
+      "MASK"
+    ],
+    [
+      60,
+      40,
+      3,
+      46,
+      4,
+      "LLS_REPAIR_INFO"
+    ],
+    [
+      61,
+      40,
+      5,
+      46,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      62,
+      40,
+      6,
+      46,
+      2,
+      "CONDITIONING"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "T2I+I2I",
+      "bounding": [
+        408.21327185361724,
+        -820.4548905335885,
+        1767.369279174805,
+        773.8946395874026
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "Qwen系列",
+      "bounding": [
+        411.06218625162745,
+        -27.797312919282117,
+        1766.24,
+        642.9727429809573
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "局部重绘",
+      "bounding": [
+        411.20928282019526,
+        632.5416781800909,
+        1766.0618691203367,
+        678.9584997049681
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        -271.34962416903875,
+        -294.342706274949
+      ]
+    },
+    "frontendVersion": "1.43.18"
+  },
+  "version": 0.4
+}

@@ -112,6 +112,54 @@ class TestRepairSampler(unittest.TestCase):
         self.assertEqual(payload["repair_scope"], "region")
         self.assertEqual(payload["repair_kernel"], "latent_mask")
 
+    def test_sampler_recovers_shifted_values_from_broken_widget_order(self):
+        load_plugin_package()
+        from lls_node_test_repair.sampling import nodes as sampling_nodes
+
+        node = sampling_nodes.LLSSimpleKSampler()
+        latent = {"samples": FakeLatentTensor((1, 4, 64, 64)), "source": "repair_prepare_region"}
+        with mock.patch.object(sampling_nodes, "comfy_sample", object()), mock.patch.object(
+            sampling_nodes,
+            "comfy_samplers",
+            types.SimpleNamespace(KSampler=types.SimpleNamespace(SAMPLERS=["euler"], SCHEDULERS=["karras"])),
+        ), mock.patch.object(
+            sampling_nodes,
+            "_common_ksampler",
+            return_value={"samples": "done"},
+        ) as common:
+            _result_latent, sample_info = node.sample(
+                model=types.SimpleNamespace(_lls_family="FLUX_DEV"),
+                positive="positive",
+                negative="negative",
+                latent_image=latent,
+                quality_preset="Manual",
+                seed=7,
+                steps=20,
+                cfg=7.0,
+                sampler_name="euler",
+                scheduler="karras",
+                denoise=0.33,
+                denoise_mode=4.2,
+                adapter_mode="Auto",
+                flux_guidance="auto_from_repair",
+                model_family="auto",
+                repair_info={
+                    "repair_scope": "region",
+                    "repair_kernel": "latent_mask",
+                    "recommended_denoise": 0.61,
+                    "model_family": "FLUX_DEV",
+                    "model_role": "normal",
+                },
+                guidance_stack=None,
+                model_info=None,
+            )
+
+        self.assertEqual(common.call_args.kwargs["denoise"], 0.61)
+        payload = json.loads(sample_info)
+        self.assertEqual(payload["family"], "FLUX_DEV")
+        self.assertEqual(payload["guidance"], 4.2)
+        self.assertTrue(payload["repair_mode"])
+
     def test_sampler_rejects_unsupported_qwen_adapter(self):
         load_plugin_package()
         from lls_node_test_repair.sampling import nodes as sampling_nodes

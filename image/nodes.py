@@ -145,7 +145,7 @@ class LLSSimpleVAEEncode:
     编码本身复用 ComfyUI 原生 vae.encode，只在外层补尺寸处理与元信息。
     """
 
-    CATEGORY = "LLS-node"
+    CATEGORY = "LLS/Image"
     FUNCTION = "encode"
     RETURN_TYPES = ("LATENT", "INT", "INT", "STRING")
     RETURN_NAMES = ("latent", "width", "height", "latent_info")

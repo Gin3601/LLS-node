@@ -593,7 +593,7 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(sample_data["sampler_name"], "euler")
         self.assertEqual(latent["samples"].shape, (1, 4, 64, 64))
 
-    def test_ksampler_schema_appends_repair_widgets_after_legacy_widgets(self):
+    def test_ksampler_schema_keeps_legacy_widget_order_for_workflow_compatibility(self):
         plugin = load_plugin_package()
         node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimpleKSampler"]
         required = node_cls.INPUT_TYPES()["required"]
@@ -612,10 +612,10 @@ class TestLoaderPromptRefactor(unittest.TestCase):
                 "sampler_name",
                 "scheduler",
                 "denoise",
-                "flux_guidance",
-                "model_family",
                 "denoise_mode",
                 "adapter_mode",
+                "flux_guidance",
+                "model_family",
             ),
         )
         self.assertEqual(required["model_family"][1]["default"], "Auto")
@@ -700,6 +700,7 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         required = node_cls.INPUT_TYPES()["required"]
         optional = node_cls.INPUT_TYPES()["optional"]
 
+        self.assertEqual(node_cls.CATEGORY, "LLS/Image")
         self.assertEqual(node_cls.RETURN_TYPES, ("LATENT", "INT", "INT", "STRING"))
         self.assertEqual(required["image"][0], "IMAGE")
         self.assertEqual(required["vae"][0], "VAE")
