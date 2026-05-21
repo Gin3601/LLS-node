@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import random
 
+from ..repair.repair_utils import normalize_model_info, normalize_repair_info, resolve_adapter_mode
 from ..utils.model_info import (
     FAMILY_DEFAULT_PRESET,
     MODEL_FAMILY_CHOICES,
@@ -74,6 +75,8 @@ _DEFAULT_SAMPLERS = ["euler", "euler_ancestral", "heun", "dpm_2", "dpm_2_ancestr
                      "dpmpp_sde", "dpmpp_2m", "dpmpp_2m_sde", "ddim", "uni_pc"]
 _DEFAULT_SCHEDULERS = ["normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform"]
 _PRIMITIVE_NUMBER_INPUT = "STRING,FLOAT,INT"
+_DENOISE_MODE_CHOICES = ["manual", "auto_from_repair"]
+_ADAPTER_MODE_CHOICES = ["auto", "sd_classic", "flux", "sd3", "qwen", "zimage"]
 
 
 def _get_samplers() -> list[str]:
@@ -237,11 +240,18 @@ class LLSSimpleKSampler:
                 "sampler_name": (_get_samplers(), {"default": "euler_ancestral"}),
                 "scheduler": (_get_schedulers(), {"default": "karras"}),
                 "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "denoise_mode": (_DENOISE_MODE_CHOICES, {"default": "manual"}),
+                "adapter_mode": (_ADAPTER_MODE_CHOICES, {"default": "auto"}),
                 "flux_guidance": (
                     _PRIMITIVE_NUMBER_INPUT,
                     {"default": 3.5, "widgetType": "FLOAT", "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.1},
                 ),
                 "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
+            },
+            "optional": {
+                "repair_info": ("LLS_REPAIR_INFO",),
+                "guidance_stack": ("LLS_GUIDANCE_STACK",),
+                "model_info": ("STRING",),
             },
         }
 
@@ -271,8 +281,13 @@ class LLSSimpleKSampler:
         sampler_name: str,
         scheduler: str,
         denoise: float,
-        flux_guidance,
+        denoise_mode: str = "manual",
+        adapter_mode: str = "auto",
+        flux_guidance=3.5,
         model_family: str = "Auto",
+        repair_info=None,
+        guidance_stack=None,
+        model_info=None,
     ):
         if comfy_sample is None:
             raise RuntimeError(
@@ -285,7 +300,23 @@ class LLSSimpleKSampler:
                 "Make sure this node runs inside a ComfyUI environment."
             ) from _COMFY_SAMPLERS_ERR
 
+        repair_meta = normalize_repair_info(repair_info) if repair_info is not None else None
+        model_meta = normalize_model_info(model_info)
+
         family = resolve_model_family(model_family, model=model)
+        if repair_meta is not None and repair_meta.get("model_family") not in {"UNKNOWN", "", None}:
+            family = str(repair_meta["model_family"])
+        elif model_meta.get("model_family") not in {"UNKNOWN", "", None}:
+            family = str(model_meta["model_family"])
+
+        effective_adapter = resolve_adapter_mode(adapter_mode, family)
+        if effective_adapter == "sd3":
+            raise RuntimeError("[LLS] SD3 repair-aware sampling is not implemented yet.")
+        if effective_adapter == "qwen":
+            raise RuntimeError("[LLS] QWEN repair-aware sampling is not implemented yet.")
+        if effective_adapter == "zimage":
+            raise RuntimeError("[LLS] ZIMAGE repair-aware sampling is not implemented yet.")
+
         defaults = get_family_defaults(family)
         default_flux_guidance = defaults.get("default_guidance")
         effective_task_mode = infer_task_mode_from_latent(latent_image)
@@ -310,6 +341,9 @@ class LLSSimpleKSampler:
                     flux_guidance = float(preset["guidance"])
 
         flux_guidance = _normalize_flux_guidance(flux_guidance, fallback=default_flux_guidance)
+        actual_denoise = float(denoise)
+        if repair_meta is not None and denoise_mode == "auto_from_repair":
+            actual_denoise = float(repair_meta.get("recommended_denoise", denoise))
 
         if is_flux_family(family):
             guidance_value = flux_guidance
@@ -340,7 +374,7 @@ class LLSSimpleKSampler:
                 positive=positive,
                 negative=negative,
                 latent=latent_image,
-                denoise=denoise,
+                denoise=actual_denoise,
             )
         except Exception as exc:
             raise RuntimeError(
@@ -355,10 +389,14 @@ class LLSSimpleKSampler:
                 "guidance": guidance_value,
                 "sampler_name": sampler_name,
                 "scheduler": scheduler,
-                "denoise": denoise,
+                "denoise": actual_denoise,
                 "quality_preset": quality_preset,
                 "family": family,
                 "task_mode": effective_task_mode,
+                "repair_mode": repair_meta is not None,
+                "repair_scope": repair_meta.get("repair_scope") if repair_meta else None,
+                "repair_kernel": repair_meta.get("repair_kernel") if repair_meta else None,
+                "guidance_used": bool(guidance_stack),
             }
         )
         return (result_latent, sample_info)

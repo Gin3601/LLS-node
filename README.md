@@ -76,6 +76,45 @@ node/
 
 ---
 
+## Image Repair
+
+`LLS-node` 现在提供一套面向本地工作流的修复链路，由以下节点组成：
+
+- `LLS Simple Repair Prepare`
+- `LLS Simple KSampler`
+- `LLS Simple Repair Finish`
+
+修复工作流不是从 `LLS Simple Empty Latent` 开始，而是从 `image + mask + vae` 开始。`LLS Simple Repair Prepare` 会把这些输入转换为带有 `repair_info` 的修复态 latent，再交给同一个 `LLS Simple KSampler` 继续采样。
+
+### Minimal Repair Workflow
+
+`Load Image -> Load Mask -> LLS Simple Checkpoint Loader -> LLS Simple Prompt Encode -> LLS Simple Repair Prepare -> LLS Simple KSampler -> VAE Decode -> LLS Simple Repair Finish -> Preview Image`
+
+### `repair_scope`
+
+- `region`：在原图边界内直接修复
+- `crop`：围绕 mask 裁剪局部工作区，提高局部细节修复精度
+- `canvas`：扩展画布后修复新增区域或缺失区域
+
+### `repair_kernel`
+
+- `latent_mask`：对工作图做 VAE encode，并附带 latent noise mask
+- `vae_inpaint`：使用兼容 VAE inpaint 的 latent 准备方式
+- `native_fill`：当后端原生支持 fill/inpaint 时优先请求原生能力，否则回退并发出 warning
+
+### `denoise_mode`
+
+- `manual`：直接使用 sampler 上的 `denoise`
+- `auto_from_repair`：使用 `repair_info["recommended_denoise"]`
+
+### Compatibility
+
+- 未连接 `repair_info` 时，现有 txt2img 工作流保持不变。
+- 未连接 `repair_info` 时，现有 img2img 工作流保持不变。
+- 同一个 `LLS Simple KSampler` 同时处理 txt2img、img2img 和 repair。
+
+---
+
 ## 扩展节点
 
 在对应子包的 `nodes.py` 中添加节点类并注册到 `NODE_CLASS_MAPPINGS`，重启 ComfyUI 自动生效。

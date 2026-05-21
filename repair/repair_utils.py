@@ -519,6 +519,93 @@ def make_noise_mask(mask: Any, latent_samples: Any) -> Any:
     return resize_mask_to(mask, latent_width, latent_height)
 
 
+def build_preview_image(original_image: Any, final_image: Any, work_mask: Any, preview_mode: str) -> Any:
+    del original_image, work_mask
+
+    if preview_mode in {"compare", "before_after"} and hasattr(final_image, "canvas_expanded"):
+        final_width, final_height = get_image_size(final_image)
+        return final_image.canvas_expanded(final_width * 2, final_height)
+
+    return final_image
+
+
+def compose_region_result(
+    original_image: Any,
+    generated_image: Any,
+    work_mask: Any,
+    repair_info: dict[str, Any],
+    feather: float,
+    color_match: str,
+    brightness_match: str,
+    blend_strength: float,
+    restore_unmasked_area: bool,
+    edge_fix: str,
+) -> Any:
+    del work_mask, repair_info, feather, color_match, brightness_match, blend_strength, restore_unmasked_area, edge_fix
+
+    original_width, original_height = get_image_size(original_image)
+    return resize_image_to(generated_image, original_width, original_height)
+
+
+def compose_crop_result(
+    original_image: Any,
+    generated_image: Any,
+    work_mask: Any,
+    repair_info: dict[str, Any],
+    feather: float,
+    color_match: str,
+    brightness_match: str,
+    blend_strength: float,
+    restore_unmasked_area: bool,
+    edge_fix: str,
+) -> Any:
+    del work_mask, repair_info, feather, color_match, brightness_match, blend_strength, restore_unmasked_area, edge_fix
+
+    original_width, original_height = get_image_size(original_image)
+    return resize_image_to(generated_image, original_width, original_height)
+
+
+def compose_canvas_result(
+    original_image: Any,
+    generated_image: Any,
+    work_mask: Any,
+    repair_info: dict[str, Any],
+    feather: float,
+    color_match: str,
+    brightness_match: str,
+    blend_strength: float,
+    restore_unmasked_area: bool,
+    edge_fix: str,
+) -> Any:
+    del original_image, work_mask, feather, color_match, brightness_match, blend_strength, restore_unmasked_area, edge_fix
+
+    work_size = repair_info.get("work_size")
+    if not isinstance(work_size, (list, tuple)) or len(work_size) != 2:
+        raise RuntimeError("[LLS] canvas repair_info must include work_size.")
+    work_width = _coerce_int(work_size[0], 0)
+    work_height = _coerce_int(work_size[1], 0)
+    if work_width <= 0 or work_height <= 0:
+        raise RuntimeError("[LLS] canvas work_size must be positive.")
+    return resize_image_to(generated_image, work_width, work_height)
+
+
+def resolve_adapter_mode(adapter_mode: str, model_family: str) -> str:
+    mode = str(adapter_mode or "auto")
+    if mode != "auto":
+        return mode
+
+    family = _normalize_model_family(model_family)
+    if family.startswith("FLUX"):
+        return "flux"
+    if family.startswith("SD3"):
+        return "sd3"
+    if family.startswith("QWEN"):
+        return "qwen"
+    if family.startswith("ZIMAGE"):
+        return "zimage"
+    return "sd_classic"
+
+
 def _is_torch_tensor(value: Any) -> bool:
     return bool(torch is not None and isinstance(value, torch.Tensor))
 
@@ -655,25 +742,6 @@ def _blur_mask_tensor(mask: Any, radius: float) -> Any:
         padding=blur_amount,
     )
     return blurred.squeeze(1)
-
-
-def resolve_adapter_mode(adapter_mode: str, model_family: str) -> str:
-    mode = str(adapter_mode or "auto")
-    if mode != "auto":
-        return mode
-
-    family = _normalize_model_family(model_family)
-    if family in {"SD1.5", "SDXL", "SDXL_TURBO"}:
-        return "sd_classic"
-    if family in {"FLUX", "FLUX_DEV", "FLUX_SCHNELL"}:
-        return "flux"
-    if family == "SD3":
-        return "sd3"
-    if family == "QWEN":
-        return "qwen"
-    if family == "ZIMAGE":
-        return "zimage"
-    return "auto"
 
 
 def _coerce_int(value: Any, default: int) -> int:

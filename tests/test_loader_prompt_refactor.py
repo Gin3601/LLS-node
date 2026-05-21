@@ -612,6 +612,8 @@ class TestLoaderPromptRefactor(unittest.TestCase):
                 "sampler_name",
                 "scheduler",
                 "denoise",
+                "denoise_mode",
+                "adapter_mode",
                 "flux_guidance",
                 "model_family",
             ),
