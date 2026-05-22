@@ -366,6 +366,7 @@
       "widgets_values": [
         "Family Default",
         -1,
+        "randomize",
         20,
         7.0,
         "euler",
