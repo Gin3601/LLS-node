@@ -39,6 +39,7 @@ from ..utils.model_info import (
     MODEL_FAMILY_CHOICES,
     canonicalize_family,
     get_family_defaults,
+    info_to_json,
     infer_family_from_name,
     is_flux_family,
     is_sdxl_family,
@@ -53,6 +54,8 @@ NO_TEXT_ENCODER_PLACEHOLDER = "(no text encoders found)"
 LOAD_MODE_CHOICES = ["simple", "advanced"]
 VAE_SOURCE_CHOICES = ["auto", "embedded", "external", "none"]
 TEXT_ENCODER_SOURCE_CHOICES = ["auto", "embedded", "external", "manual"]
+UNIVERSAL_VAE_SOURCE_CHOICES = ["auto", "embedded", "external"]
+UNIVERSAL_TEXT_ENCODER_SOURCE_CHOICES = ["auto", "embedded", "external"]
 
 _FLUX_CLIP_L_PATTERNS = ("clip_l.safetensors", "clip_l", "clip-l")
 _FLUX_T5_PATTERNS = ("t5xxl_fp8_e4m3fn.safetensors", "t5xxl_fp16.safetensors", "t5xxl", "t5")
@@ -371,6 +374,120 @@ def _resolve_vae(
     return None, "none", None
 
 
+def _resolve_loader_family(model_name: str, model_family: str) -> str:
+    if model_family == "Auto":
+        return infer_family_from_name(model_name, "SD1.5")
+    return canonicalize_family(model_family)
+
+
+def _load_tagged_resources(
+    *,
+    model_name: str,
+    model_family: str,
+    load_mode: str,
+    vae_source: str,
+    text_encoder_source: str,
+    vae_name: str,
+    text_encoder_name_1: str,
+    text_encoder_name_2: str,
+):
+    if folder_paths is None:
+        raise RuntimeError(
+            "[LLS] folder_paths is not available. Make sure this node runs inside ComfyUI."
+        ) from _FOLDER_PATHS_ERR
+    if comfy_sd is None:
+        raise RuntimeError(
+            "[LLS] comfy.sd is not available. Make sure this node runs inside ComfyUI."
+        ) from _COMFY_SD_ERR
+
+    family = _resolve_loader_family(model_name, model_family)
+    model_source, model_path = _resolve_model_path(model_name, family)
+    model, embedded_text_encoder, embedded_vae = _load_model(model_source, model_path)
+    if model is None:
+        raise RuntimeError(f"[LLS] The selected model '{model_name}' did not produce a valid diffusion model.")
+
+    external_vae_name = _normalize_choice(vae_name, NO_VAE_PLACEHOLDER)
+    external_text_encoder_1 = _normalize_choice(text_encoder_name_1, NO_TEXT_ENCODER_PLACEHOLDER)
+    external_text_encoder_2 = _normalize_choice(text_encoder_name_2, NO_TEXT_ENCODER_PLACEHOLDER)
+
+    text_encoder, resolved_text_encoder_source, resolved_te_1, resolved_te_2 = _resolve_text_encoder(
+        family=family,
+        source=text_encoder_source,
+        embedded_text_encoder=embedded_text_encoder,
+        external_name_1=external_text_encoder_1,
+        external_name_2=external_text_encoder_2,
+    )
+    vae, resolved_vae_source, resolved_vae_name = _resolve_vae(
+        family=family,
+        source=vae_source,
+        embedded_vae=embedded_vae,
+        external_vae_name=external_vae_name,
+    )
+
+    defaults = get_family_defaults(family)
+    capability_tags = _build_capability_tags(model_name, family)
+    resolved_text_encoder_name = resolved_te_1 or ("embedded" if text_encoder is not None else None)
+    resolved_text_encoder_name_1 = resolved_te_1 or ("embedded" if text_encoder is not None and not resolved_te_2 else None)
+    resolved_text_encoder_name_2 = resolved_te_2
+    if resolved_te_1 and resolved_te_2:
+        resolved_text_encoder_name = ", ".join([resolved_te_1, resolved_te_2])
+    resolved_vae_label = resolved_vae_name or ("embedded" if vae is not None else None)
+
+    tag_lls_object(
+        model,
+        family=family,
+        model_name=model_name,
+        checkpoint_name=model_name,
+        load_mode=load_mode,
+        **capability_tags,
+    )
+    tag_lls_object(
+        text_encoder,
+        family=family,
+        model_name=model_name,
+        checkpoint_name=model_name,
+        text_encoder_type=defaults["text_encoder_type"],
+        text_encoder_source=resolved_text_encoder_source,
+        text_encoder_name=resolved_text_encoder_name,
+        text_encoder_name_1=resolved_text_encoder_name_1,
+        text_encoder_name_2=resolved_text_encoder_name_2,
+        **capability_tags,
+    )
+    tag_lls_object(
+        vae,
+        family=family,
+        model_name=model_name,
+        checkpoint_name=model_name,
+        vae_name=resolved_vae_label,
+        vae_source=resolved_vae_source,
+        **capability_tags,
+    )
+
+    model_info = {
+        "model_family": family,
+        "checkpoint_name": model_name,
+        "model_name": model_name,
+        "load_mode": load_mode,
+        "model_source": model_source,
+        "profile_id": capability_tags["profile_id"],
+        "backend_type": capability_tags["backend_type"],
+        "sampler_strategy": capability_tags["sampler_strategy"],
+        "loader_strategy": capability_tags["loader_strategy"],
+        "model_role": capability_tags["model_role"],
+        "supports_inpaint_native": capability_tags["supports_inpaint_native"],
+        "supports_image_edit_native": capability_tags["supports_image_edit_native"],
+        "preferred_edit_backend": capability_tags["preferred_edit_backend"],
+        "text_encoder_type": defaults["text_encoder_type"],
+        "text_encoder_source": resolved_text_encoder_source,
+        "text_encoder_name": resolved_text_encoder_name or "",
+        "text_encoder_name_1": resolved_text_encoder_name_1 or "",
+        "text_encoder_name_2": resolved_text_encoder_name_2 or "",
+        "vae_name": resolved_vae_label or "",
+        "vae_source": resolved_vae_source,
+    }
+    return model, text_encoder, vae, model_info
+
+
 class LLSSimpleCheckpointLoader:
     """
     统一封装的基础模型加载器。
@@ -418,89 +535,74 @@ class LLSSimpleCheckpointLoader:
         external_text_encoder_1: str,
         external_text_encoder_2: str,
     ):
-        if folder_paths is None:
-            raise RuntimeError(
-                "[LLS] folder_paths is not available. Make sure this node runs inside ComfyUI."
-            ) from _FOLDER_PATHS_ERR
-        if comfy_sd is None:
-            raise RuntimeError(
-                "[LLS] comfy.sd is not available. Make sure this node runs inside ComfyUI."
-            ) from _COMFY_SD_ERR
-
-        if model_family == "Auto":
-            family = infer_family_from_name(ckpt_name, "SD1.5")
-        else:
-            family = canonicalize_family(model_family)
-
-        model_source, model_path = _resolve_model_path(ckpt_name, family)
-        model, embedded_text_encoder, embedded_vae = _load_model(model_source, model_path)
-        if model is None:
-            raise RuntimeError(f"[LLS] The selected model '{ckpt_name}' did not produce a valid diffusion model.")
-
-        external_vae_name = _normalize_choice(external_vae_name, NO_VAE_PLACEHOLDER)
-        external_text_encoder_1 = _normalize_choice(external_text_encoder_1, NO_TEXT_ENCODER_PLACEHOLDER)
-        external_text_encoder_2 = _normalize_choice(external_text_encoder_2, NO_TEXT_ENCODER_PLACEHOLDER)
-
-        text_encoder, resolved_text_encoder_source, resolved_te_1, resolved_te_2 = _resolve_text_encoder(
-            family=family,
-            source=text_encoder_source,
-            embedded_text_encoder=embedded_text_encoder,
-            external_name_1=external_text_encoder_1,
-            external_name_2=external_text_encoder_2,
-        )
-        vae, resolved_vae_source, resolved_vae_name = _resolve_vae(
-            family=family,
-            source=vae_source,
-            embedded_vae=embedded_vae,
-            external_vae_name=external_vae_name,
-        )
-
-        defaults = get_family_defaults(family)
-        capability_tags = _build_capability_tags(ckpt_name, family)
-        resolved_text_encoder_name = resolved_te_1 or ("embedded" if text_encoder is not None else None)
-        resolved_text_encoder_name_1 = resolved_te_1 or ("embedded" if text_encoder is not None and not resolved_te_2 else None)
-        resolved_text_encoder_name_2 = resolved_te_2
-        if resolved_te_1 and resolved_te_2:
-            resolved_text_encoder_name = ", ".join([resolved_te_1, resolved_te_2])
-        resolved_vae_label = resolved_vae_name or ("embedded" if vae is not None else None)
-
-        tag_lls_object(
-            model,
-            family=family,
+        model, text_encoder, vae, _model_info = _load_tagged_resources(
             model_name=ckpt_name,
-            checkpoint_name=ckpt_name,
+            model_family=model_family,
             load_mode=load_mode,
-            **capability_tags,
+            vae_source=vae_source,
+            text_encoder_source=text_encoder_source,
+            vae_name=external_vae_name,
+            text_encoder_name_1=external_text_encoder_1,
+            text_encoder_name_2=external_text_encoder_2,
         )
-        tag_lls_object(
-            text_encoder,
-            family=family,
-            model_name=ckpt_name,
-            checkpoint_name=ckpt_name,
-            text_encoder_type=defaults["text_encoder_type"],
-            text_encoder_source=resolved_text_encoder_source,
-            text_encoder_name=resolved_text_encoder_name,
-            text_encoder_name_1=resolved_text_encoder_name_1,
-            text_encoder_name_2=resolved_text_encoder_name_2,
-            **capability_tags,
-        )
-        tag_lls_object(
-            vae,
-            family=family,
-            model_name=ckpt_name,
-            checkpoint_name=ckpt_name,
-            vae_name=resolved_vae_label,
-            vae_source=resolved_vae_source,
-            **capability_tags,
-        )
-
         return (model, text_encoder, vae, text_encoder)
+
+
+class LLSUniversalModelLoader:
+    CATEGORY = "LLS/Model Loader"
+    FUNCTION = "load"
+    RETURN_TYPES = ("MODEL", "CLIP", "VAE", "STRING")
+    RETURN_NAMES = ("model", "text_encoder", "vae", "model_info")
+    DESCRIPTION = (
+        "Unified model loader for SD1.5, SDXL, and FLUX families. "
+        "Internally resolves single or dual text encoders but always exposes one text_encoder output."
+    )
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model_name": (_get_model_name_choices(),),
+                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
+                "load_mode": (LOAD_MODE_CHOICES, {"default": "simple"}),
+                "vae_source": (UNIVERSAL_VAE_SOURCE_CHOICES, {"default": "auto"}),
+                "text_encoder_source": (UNIVERSAL_TEXT_ENCODER_SOURCE_CHOICES, {"default": "auto"}),
+                "text_encoder_1": (_get_text_encoder_choices(), {"default": AUTO_PLACEHOLDER}),
+                "text_encoder_2": (_get_text_encoder_choices(), {"default": AUTO_PLACEHOLDER}),
+                "vae_name": (_get_vae_choices(), {"default": AUTO_PLACEHOLDER}),
+            },
+        }
+
+    def load(
+        self,
+        model_name: str,
+        model_family: str,
+        load_mode: str,
+        vae_source: str,
+        text_encoder_source: str,
+        text_encoder_1: str,
+        text_encoder_2: str,
+        vae_name: str,
+    ):
+        model, text_encoder, vae, model_info = _load_tagged_resources(
+            model_name=model_name,
+            model_family=model_family,
+            load_mode=load_mode,
+            vae_source=vae_source,
+            text_encoder_source=text_encoder_source,
+            vae_name=vae_name,
+            text_encoder_name_1=text_encoder_1,
+            text_encoder_name_2=text_encoder_2,
+        )
+        return model, text_encoder, vae, info_to_json(model_info)
 
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {
     "LLSSimpleCheckpointLoader": LLSSimpleCheckpointLoader,
+    "LLSUniversalModelLoader": LLSUniversalModelLoader,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
     "LLSSimpleCheckpointLoader": "LLS Simple Checkpoint Loader",
+    "LLSUniversalModelLoader": "LLS Universal Model Loader",
 }

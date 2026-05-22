@@ -297,6 +297,35 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         )
         self.assertNotIn("optional", node_cls.INPUT_TYPES())
 
+    def test_universal_loader_schema_exposes_single_text_encoder_output(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSUniversalModelLoader"]
+        required = node_cls.INPUT_TYPES()["required"]
+
+        self.assertEqual(
+            node_cls.RETURN_TYPES,
+            ("MODEL", "CLIP", "VAE", "STRING"),
+        )
+        self.assertEqual(
+            node_cls.RETURN_NAMES,
+            ("model", "text_encoder", "vae", "model_info"),
+        )
+        self.assertEqual(
+            tuple(required.keys()),
+            (
+                "model_name",
+                "model_family",
+                "load_mode",
+                "vae_source",
+                "text_encoder_source",
+                "text_encoder_1",
+                "text_encoder_2",
+                "vae_name",
+            ),
+        )
+        self.assertEqual(required["model_family"][1]["default"], "Auto")
+        self.assertEqual(required["text_encoder_source"][1]["default"], "auto")
+
     def test_loader_tags_sd15_resources_without_context_output(self):
         load_plugin_package()
         from lls_node_test_refactor.model_loader import nodes as loader_nodes
@@ -328,6 +357,36 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(clip._lls_text_encoder_type, "clip")
         self.assertEqual(vae._lls_family, "SD1.5")
 
+    def test_universal_loader_loads_sd15_into_single_text_encoder_port(self):
+        load_plugin_package()
+        from lls_node_test_refactor.model_loader import nodes as loader_nodes
+
+        with mock.patch.object(loader_nodes, "folder_paths", FolderPathsStub()), mock.patch.object(
+            loader_nodes,
+            "comfy_sd",
+            ComfySDStub(),
+        ), mock.patch.object(loader_nodes, "comfy_core_nodes", CoreNodesStub()):
+            node = loader_nodes.LLSUniversalModelLoader()
+            model, text_encoder, vae, model_info = node.load(
+                "sd15.safetensors",
+                "SD1.5",
+                "simple",
+                "auto",
+                "auto",
+                "(auto)",
+                "(auto)",
+                "(auto)",
+            )
+
+        payload = json.loads(model_info)
+        self.assertEqual(model.label, "MODEL::SD15")
+        self.assertEqual(text_encoder.label, "CLIP::SD15")
+        self.assertEqual(vae.label, "VAE::SD15")
+        self.assertEqual(payload["model_family"], "SD1.5")
+        self.assertEqual(payload["checkpoint_name"], "sd15.safetensors")
+        self.assertEqual(payload["text_encoder_source"], "embedded")
+        self.assertEqual(payload["vae_source"], "embedded")
+
     def test_loader_tags_flux_resources_and_keeps_standard_text_encoder_alias(self):
         load_plugin_package()
         from lls_node_test_refactor.model_loader import nodes as loader_nodes
@@ -357,6 +416,37 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(clip._lls_text_encoder_type, "flux_clip_l_t5xxl")
         self.assertEqual(clip._lls_model_name, "diffusion_models/flux1-schnell.safetensors")
         self.assertEqual(vae._lls_vae_name, "ae.safetensors")
+
+    def test_universal_loader_loads_flux_dual_encoders_into_single_text_encoder_port(self):
+        load_plugin_package()
+        from lls_node_test_refactor.model_loader import nodes as loader_nodes
+
+        with mock.patch.object(loader_nodes, "folder_paths", FolderPathsStub()), mock.patch.object(
+            loader_nodes,
+            "comfy_sd",
+            ComfySDStub(),
+        ), mock.patch.object(loader_nodes, "comfy_core_nodes", CoreNodesStub()):
+            node = loader_nodes.LLSUniversalModelLoader()
+            model, text_encoder, vae, model_info = node.load(
+                "diffusion_models/flux1-schnell.safetensors",
+                "FLUX_SCHNELL",
+                "advanced",
+                "external",
+                "external",
+                "clip_l.safetensors",
+                "t5xxl_fp16.safetensors",
+                "ae.safetensors",
+            )
+
+        payload = json.loads(model_info)
+        self.assertEqual(model.label, "MODEL::flux1-schnell.safetensors")
+        self.assertEqual(text_encoder.label, "CLIP::flux::clip_l.safetensors+t5xxl_fp16.safetensors")
+        self.assertEqual(vae.label, "VAE::ae.safetensors")
+        self.assertEqual(payload["model_family"], "FLUX_SCHNELL")
+        self.assertEqual(payload["text_encoder_name_1"], "clip_l.safetensors")
+        self.assertEqual(payload["text_encoder_name_2"], "t5xxl_fp16.safetensors")
+        self.assertEqual(payload["text_encoder_name"], "clip_l.safetensors, t5xxl_fp16.safetensors")
+        self.assertEqual(payload["vae_name"], "ae.safetensors")
 
     def test_loader_raises_clear_error_when_flux_text_encoder_is_missing(self):
         load_plugin_package()
@@ -393,6 +483,18 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(optional["text_encoder"][0], "CLIP")
         self.assertEqual(optional["clip"][0], "CLIP")
         self.assertNotIn("task_context", optional)
+
+    def test_universal_prompt_encode_schema_requires_single_text_encoder_input(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSUniversalPromptEncode"]
+        required = node_cls.INPUT_TYPES()["required"]
+        optional = node_cls.INPUT_TYPES()["optional"]
+
+        self.assertEqual(node_cls.RETURN_TYPES, ("CONDITIONING", "CONDITIONING", "STRING"))
+        self.assertEqual(required["text_encoder"][0], "CLIP")
+        self.assertEqual(required["clip_skip"][1]["default"], -1)
+        self.assertNotIn("clip", required)
+        self.assertEqual(optional["model_info"][0], "STRING")
 
     def test_prompt_encode_dispatches_sdxl_using_inferred_family_defaults(self):
         plugin = load_plugin_package()
@@ -448,6 +550,60 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(payload["model_family"], "FLUX_DEV")
         self.assertEqual(payload["negative_mode"], "ignored_for_flux")
         self.assertEqual(payload["prompt_mode"], "flux")
+        self.assertEqual(positive[0][0], "cond::a robot in a forest")
+        self.assertEqual(negative[0][0], "cond::")
+
+    def test_universal_prompt_encode_dispatches_sdxl_from_model_info(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSUniversalPromptEncode"]
+        node = node_cls()
+        clip = RecordingClip(("g", "l"))
+
+        positive, negative, prompt_info = node.encode(
+            text_encoder=clip,
+            positive_prompt="a castle",
+            negative_prompt="low quality",
+            clip_skip=-1,
+            model_info=json.dumps({"model_family": "SDXL", "checkpoint_name": "sdxl_turbo.safetensors"}),
+        )
+
+        self.assertEqual(len(clip.calls), 2)
+        self.assertEqual(clip.calls[0]["add_dict"]["width"], 1024)
+        payload = json.loads(prompt_info)
+        self.assertEqual(payload["model_family"], "SDXL")
+        self.assertEqual(payload["prompt_mode"], "sdxl")
+        self.assertEqual(payload["checkpoint_name"], "sdxl_turbo.safetensors")
+        self.assertEqual(positive[0][0], "cond::a castle")
+        self.assertEqual(negative[0][0], "cond::low quality")
+
+    def test_universal_prompt_encode_dispatches_flux_from_model_info(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSUniversalPromptEncode"]
+        node = node_cls()
+        clip = RecordingClip(("t5xxl",))
+
+        positive, negative, prompt_info = node.encode(
+            text_encoder=clip,
+            positive_prompt="a robot in a forest",
+            negative_prompt="ugly, blurry",
+            clip_skip=-1,
+            model_info=json.dumps(
+                {
+                    "model_family": "FLUX_DEV",
+                    "checkpoint_name": "diffusion_models/flux1-schnell.safetensors",
+                    "text_encoder_name": "clip_l.safetensors, t5xxl_fp16.safetensors",
+                }
+            ),
+        )
+
+        self.assertEqual(len(clip.calls), 2)
+        self.assertEqual(clip.calls[0]["add_dict"]["guidance"], 3.5)
+        self.assertEqual(clip.calls[1]["tokens"]["text"], "")
+        payload = json.loads(prompt_info)
+        self.assertEqual(payload["model_family"], "FLUX_DEV")
+        self.assertEqual(payload["prompt_mode"], "flux")
+        self.assertEqual(payload["checkpoint_name"], "diffusion_models/flux1-schnell.safetensors")
+        self.assertEqual(payload["text_encoder_name"], "clip_l.safetensors, t5xxl_fp16.safetensors")
         self.assertEqual(positive[0][0], "cond::a robot in a forest")
         self.assertEqual(negative[0][0], "cond::")
 
