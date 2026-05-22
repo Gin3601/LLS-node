@@ -195,6 +195,7 @@ SAMPLING_PRESETS: dict[str, dict[str, dict[str, float | int | None]]] = {
 _LEGACY_MODEL_INFO_PATTERN = re.compile(r"(\w+)=([^|]+)")
 _ROLE_KEYWORDS = (
     ("inpaint", "inpaint"),
+    ("kontext", "edit"),
     ("img2img", "edit"),
     ("imageedit", "edit"),
     ("image-edit", "edit"),
@@ -336,6 +337,14 @@ def infer_edit_capabilities(model_name: str | None, family: str | None = None) -
     }
 
 
+def _load_profile_resolver():
+    try:
+        from ..model_profiles.registry import resolve_model_profile
+    except ImportError:
+        from model_profiles.registry import resolve_model_profile
+    return resolve_model_profile
+
+
 def parse_model_info(model_info: dict[str, Any] | str | None) -> dict[str, Any]:
     raw = parse_jsonish_info(model_info)
     raw_model_name = _get_model_name_alias_value(raw)
@@ -348,25 +357,26 @@ def parse_model_info(model_info: dict[str, Any] | str | None) -> dict[str, Any]:
         )
     )
     defaults = get_family_defaults(family)
-    capability_defaults = infer_edit_capabilities(
-        raw_model_name,
-        family,
+    resolve_model_profile = _load_profile_resolver()
+    profile = resolve_model_profile(
+        model=None,
+        model_info=raw,
+        checkpoint_name=raw_model_name,
+        family=family,
     )
 
     info: dict[str, Any] = {**defaults}
     info.update(raw)
-    info["family"] = family
-    info["model_role"] = str(raw.get("model_role", capability_defaults["model_role"]))
-    info["supports_inpaint_native"] = _coerce_bool(
-        raw.get("supports_inpaint_native", capability_defaults["supports_inpaint_native"])
-    )
-    info["supports_image_edit_native"] = _coerce_bool(
-        raw.get("supports_image_edit_native", capability_defaults["supports_image_edit_native"])
-    )
-    info["preferred_edit_backend"] = raw.get(
-        "preferred_edit_backend",
-        capability_defaults["preferred_edit_backend"],
-    )
+    info["family"] = profile["family"]
+    info["model_family"] = profile["family"]
+    info["model_role"] = profile["role"]
+    info["profile_id"] = profile["profile_id"]
+    info["backend_type"] = profile["backend_type"]
+    info["sampler_strategy"] = profile["sampler_strategy"]
+    info["loader_strategy"] = profile["loader_strategy"]
+    info["supports_inpaint_native"] = _coerce_bool(profile["supports_inpaint_native"])
+    info["supports_image_edit_native"] = _coerce_bool(profile["supports_image_edit_native"])
+    info["preferred_edit_backend"] = profile["preferred_edit_backend"]
     info["text_encoder_type"] = raw.get("text_encoder_type", defaults["text_encoder_type"])
     required_text_encoders = raw.get("required_text_encoders", defaults["required_text_encoders"])
     if isinstance(required_text_encoders, str):
@@ -402,7 +412,6 @@ def parse_model_info(model_info: dict[str, Any] | str | None) -> dict[str, Any]:
 
     info.setdefault("checkpoint_name", raw_model_name or "")
     info.setdefault("model_name", info["checkpoint_name"])
-    info["model_family"] = family
     info.setdefault("vae_source", raw.get("vae_source", "auto"))
     info.setdefault("text_encoder_source", raw.get("text_encoder_source", "auto"))
     info.setdefault("load_mode", raw.get("load_mode", "simple"))
@@ -516,12 +525,12 @@ def get_lls_attr(obj, name: str, default: Any = None) -> Any:
 def resolve_edit_capabilities(model=None, model_info: dict[str, Any] | str | None = None) -> dict[str, Any]:
     raw = parse_jsonish_info(model_info)
     info = parse_model_info(model_info)
-    raw_model_name = _get_model_name_alias_value(raw)
     model_name = str(
-        raw_model_name
+        _get_model_name_alias_value(raw)
+        or get_lls_attr(model, "checkpoint_name", None)
+        or get_lls_attr(model, "model_name", "")
         or info.get("checkpoint_name")
         or info.get("model_name")
-        or get_lls_attr(model, "model_name", "")
         or ""
     )
     family = canonicalize_family(
@@ -532,41 +541,24 @@ def resolve_edit_capabilities(model=None, model_info: dict[str, Any] | str | Non
         or info.get("model_family")
         or infer_family_from_model(model)
     )
-    inferred = infer_edit_capabilities(model_name, family)
+    resolve_model_profile = _load_profile_resolver()
+    profile = resolve_model_profile(
+        model=model,
+        model_info=model_info,
+        checkpoint_name=model_name,
+        family=family,
+    )
     return {
-        "model_family": family,
+        "model_family": profile["family"],
         "model_name": model_name,
-        "model_role": str(
-            raw.get("model_role")
-            or get_lls_attr(model, "model_role", None)
-            or info.get("model_role")
-            or inferred["model_role"]
-        ),
-        "supports_inpaint_native": _coerce_bool(
-            raw.get(
-                "supports_inpaint_native",
-                get_lls_attr(
-                    model,
-                    "supports_inpaint_native",
-                    info.get("supports_inpaint_native", inferred["supports_inpaint_native"]),
-                ),
-            )
-        ),
-        "supports_image_edit_native": _coerce_bool(
-            raw.get(
-                "supports_image_edit_native",
-                get_lls_attr(
-                    model,
-                    "supports_image_edit_native",
-                    info.get("supports_image_edit_native", inferred["supports_image_edit_native"]),
-                ),
-            )
-        ),
-        "preferred_edit_backend": (
-            raw.get("preferred_edit_backend")
-            or get_lls_attr(model, "preferred_edit_backend", inferred["preferred_edit_backend"])
-            or info.get("preferred_edit_backend")
-        ),
+        "model_role": profile["role"],
+        "profile_id": profile["profile_id"],
+        "backend_type": profile["backend_type"],
+        "sampler_strategy": profile["sampler_strategy"],
+        "loader_strategy": profile["loader_strategy"],
+        "supports_inpaint_native": _coerce_bool(profile["supports_inpaint_native"]),
+        "supports_image_edit_native": _coerce_bool(profile["supports_image_edit_native"]),
+        "preferred_edit_backend": profile["preferred_edit_backend"],
     }
 
 

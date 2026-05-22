@@ -11,37 +11,48 @@ class TestProEditRegistry(unittest.TestCase):
         self.plugin = load_plugin_package()
         self.registry = import_plugin_submodule(self.plugin, "pro_edit.backends.registry")
 
-    def test_auto_routes_sdxl_inpaint_model(self):
+    def test_auto_routes_sdxl_profile_by_backend_type(self):
         model = FakeModel(
             family="SDXL",
-            model_role="inpaint",
+            model_role="edit",
             supports_inpaint_native=True,
-            supports_image_edit_native=False,
+            supports_image_edit_native=True,
             preferred_edit_backend="sdxl",
+            profile_id="sdxl_edit",
+            backend_type="sdxl_native",
+            sampler_strategy="standard_k",
+            loader_strategy="sdxl_checkpoint",
         )
 
         backend, routing = self.registry.resolve_backend("auto", model=model)
 
         self.assertEqual(backend.backend_name, "sdxl")
         self.assertEqual(routing.backend_name, "sdxl")
-        self.assertEqual(routing.routing_reason, "model.preferred_edit_backend")
+        self.assertEqual(routing.routing_reason, "profile.backend_type")
+        self.assertEqual(routing.profile["profile_id"], "sdxl_edit")
+        self.assertEqual(routing.profile["backend_type"], "sdxl_native")
 
-    def test_auto_routes_flux_edit_model(self):
+    def test_auto_routes_flux_profile_by_backend_type(self):
         model = FakeModel(
             family="FLUX_DEV",
             model_role="edit",
             supports_inpaint_native=False,
             supports_image_edit_native=True,
             preferred_edit_backend="flux",
+            profile_id="flux_edit",
+            backend_type="flux_edit",
+            sampler_strategy="flux_guided",
+            loader_strategy="flux_split_or_bundle",
         )
 
         backend, routing = self.registry.resolve_backend("auto", model=model)
 
         self.assertEqual(backend.backend_name, "flux")
-        self.assertEqual(routing.routing_reason, "model.preferred_edit_backend")
+        self.assertEqual(routing.routing_reason, "profile.backend_type")
         self.assertEqual(routing.capabilities["model_family"], "FLUX_DEV")
+        self.assertEqual(routing.profile["profile_id"], "flux_edit")
 
-    def test_auto_reuses_backend_name_from_edit_info(self):
+    def test_auto_upgrades_legacy_edit_info_to_profile_route(self):
         backend, routing = self.registry.resolve_backend(
             "auto",
             model=None,
@@ -56,7 +67,8 @@ class TestProEditRegistry(unittest.TestCase):
         )
 
         self.assertEqual(backend.backend_name, "sdxl")
-        self.assertEqual(routing.routing_reason, "edit_info.backend_name")
+        self.assertEqual(routing.routing_reason, "profile.backend_type")
+        self.assertEqual(routing.profile["profile_id"], "sdxl_inpaint")
 
     def test_manual_flux_override_rejects_sdxl_only_model(self):
         model = FakeModel(
@@ -65,21 +77,29 @@ class TestProEditRegistry(unittest.TestCase):
             supports_inpaint_native=True,
             supports_image_edit_native=False,
             preferred_edit_backend="sdxl",
+            profile_id="sdxl_inpaint",
+            backend_type="sdxl_native",
+            sampler_strategy="standard_k",
+            loader_strategy="sdxl_checkpoint",
         )
 
-        with self.assertRaisesRegex(RuntimeError, "backend 'flux' is incompatible"):
+        with self.assertRaisesRegex(RuntimeError, "backend 'flux' is incompatible with profile"):
             self.registry.resolve_backend("flux", model=model)
 
-    def test_auto_without_matching_backend_raises_clear_error(self):
+    def test_auto_rejects_base_profile_for_pro_chain(self):
         model = FakeModel(
-            family="SD1.5",
+            family="SDXL",
             model_role="base",
             supports_inpaint_native=False,
             supports_image_edit_native=False,
             preferred_edit_backend=None,
+            profile_id="sdxl_base",
+            backend_type="none",
+            sampler_strategy="standard_k",
+            loader_strategy="sdxl_checkpoint",
         )
 
-        with self.assertRaisesRegex(RuntimeError, "No professional edit backend matched"):
+        with self.assertRaisesRegex(RuntimeError, "Pro image edit is not available for profile 'sdxl_base'"):
             self.registry.resolve_backend("auto", model=model)
 
 

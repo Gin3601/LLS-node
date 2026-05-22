@@ -36,6 +36,10 @@ class TestProEditPrepareFlux(unittest.TestCase):
             supports_inpaint_native=False,
             supports_image_edit_native=True,
             preferred_edit_backend="flux",
+            profile_id="flux_edit",
+            backend_type="flux_edit",
+            sampler_strategy="flux_guided",
+            loader_strategy="flux_split_or_bundle",
         )
 
         latent, work_image, work_mask, edit_info, recommended, positive, negative = self.node.prepare(
@@ -66,7 +70,11 @@ class TestProEditPrepareFlux(unittest.TestCase):
         )
 
         self.assertEqual(edit_info["backend_name"], "flux")
+        self.assertEqual(edit_info["routing_reason"], "profile.backend_type")
         self.assertEqual(edit_info["model_family"], "FLUX_DEV")
+        self.assertEqual(edit_info["profile_id"], "flux_edit")
+        self.assertEqual(edit_info["backend_type"], "flux_edit")
+        self.assertEqual(edit_info["sampler_strategy"], "flux_guided")
         self.assertTrue(edit_info["supports_image_edit_native"])
         self.assertIn("concat_latent_image", positive[0][1])
         self.assertIn("concat_mask", positive[0][1])
@@ -84,6 +92,10 @@ class TestProEditPrepareFlux(unittest.TestCase):
             supports_inpaint_native=False,
             supports_image_edit_native=True,
             preferred_edit_backend="flux",
+            profile_id="flux_edit",
+            backend_type="flux_edit",
+            sampler_strategy="flux_guided",
+            loader_strategy="flux_split_or_bundle",
         )
 
         latent, work_image, work_mask, edit_info, recommended, positive, negative = self.node.prepare(
@@ -116,6 +128,9 @@ class TestProEditPrepareFlux(unittest.TestCase):
         self.assertEqual(edit_info["edit_scope"], "canvas")
         self.assertEqual(edit_info["original_box_in_canvas"], [64, 32, 832, 800])
         self.assertEqual(edit_info["work_size"], [896, 832])
+        self.assertEqual(edit_info["profile_id"], "flux_edit")
+        self.assertEqual(edit_info["backend_type"], "flux_edit")
+        self.assertEqual(edit_info["sampler_strategy"], "flux_guided")
         self.assertEqual(positive[0][1]["edit_backend"], "flux")
         self.assertGreater(recommended, 0.0)
 

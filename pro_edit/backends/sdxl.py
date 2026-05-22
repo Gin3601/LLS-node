@@ -5,15 +5,8 @@ from ..pro_edit_utils import build_native_conditioning_payload, set_conditioning
 class SDXLProEditBackend:
     backend_name = "sdxl"
 
-    def supports(self, capabilities):
-        family = str(capabilities.get("model_family") or "")
-        role = str(capabilities.get("model_role") or "")
-        preferred = str(capabilities.get("preferred_edit_backend") or "").strip().lower()
-        return family.startswith("SDXL") and (
-            role in {"inpaint", "edit", "fill"}
-            or bool(capabilities.get("supports_inpaint_native"))
-            or preferred == self.backend_name
-        )
+    def supports(self, profile):
+        return str(profile.get("backend_type") or "").strip().lower() == "sdxl_native"
 
     def prepare(self, *, vae, work_image, work_mask, positive, negative, workspace, routing, **_kwargs):
         latent, concat_latent_image, concat_mask = build_native_conditioning_payload(

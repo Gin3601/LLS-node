@@ -16,6 +16,12 @@ class TestProEditDocs(unittest.TestCase):
             "Simple = lightweight masked latent resampling",
             "Pro = true image edit / inpaint pipeline",
             "backend_mode = auto | sdxl | flux",
+            "profile-driven routing",
+            "profile_id",
+            "backend_type",
+            "sampler_strategy",
+            "LLS Simple Checkpoint Loader writes the resolved model profile",
+            "FLUX base models should remain on the Simple workflow unless they resolve to flux_edit",
             "Load Image -> Load Mask or LLS Simple Mask Draw -> LLS Simple Checkpoint Loader -> LLS Simple Prompt Encode -> LLS Pro Image Edit Prepare -> LLS Pro KSampler Bridge -> VAE Decode -> LLS Pro Image Edit Finish -> Preview Image",
             "Adding new professional edit models",
         ):

@@ -41,6 +41,38 @@ class TestProEditCapabilities(unittest.TestCase):
         self.assertTrue(info["supports_image_edit_native"])
         self.assertEqual(info["preferred_edit_backend"], "flux")
 
+    def test_parse_model_info_infers_flux_kontext_as_edit_capable(self):
+        plugin = load_plugin_package()
+        model_info = import_plugin_submodule(plugin, "utils.model_info")
+
+        info = model_info.parse_model_info(
+            {
+                "checkpoint_name": "demo-flux-kontext-dev.safetensors",
+                "family": "FLUX_DEV",
+            }
+        )
+
+        self.assertEqual(info["model_role"], "edit")
+        self.assertFalse(info["supports_inpaint_native"])
+        self.assertTrue(info["supports_image_edit_native"])
+        self.assertEqual(info["preferred_edit_backend"], "flux")
+
+    def test_parse_model_info_exposes_profile_fields(self):
+        plugin = load_plugin_package()
+        model_info = import_plugin_submodule(plugin, "utils.model_info")
+
+        info = model_info.parse_model_info(
+            {
+                "checkpoint_name": "demo-flux-kontext-dev.safetensors",
+                "family": "FLUX_DEV",
+            }
+        )
+
+        self.assertEqual(info["profile_id"], "flux_edit")
+        self.assertEqual(info["backend_type"], "flux_edit")
+        self.assertEqual(info["sampler_strategy"], "flux_guided")
+        self.assertEqual(info["loader_strategy"], "flux_split_or_bundle")
+
     def test_parse_model_info_infers_capabilities_from_ckpt_name_alias(self):
         plugin = load_plugin_package()
         model_info = import_plugin_submodule(plugin, "utils.model_info")
@@ -143,6 +175,29 @@ class TestProEditCapabilities(unittest.TestCase):
         self.assertEqual(capabilities["model_role"], "edit")
         self.assertTrue(capabilities["supports_image_edit_native"])
         self.assertEqual(capabilities["preferred_edit_backend"], "flux")
+
+    def test_resolve_edit_capabilities_reads_profile_tags(self):
+        plugin = load_plugin_package()
+        model_info = import_plugin_submodule(plugin, "utils.model_info")
+        model = FakeModel(
+            family="SDXL",
+            model_role="edit",
+            supports_inpaint_native=True,
+            supports_image_edit_native=True,
+            preferred_edit_backend="sdxl",
+            profile_id="sdxl_edit",
+            backend_type="sdxl_native",
+            sampler_strategy="standard_k",
+            loader_strategy="sdxl_checkpoint",
+            model_name="demo-sdxl-edit.safetensors",
+        )
+
+        capabilities = model_info.resolve_edit_capabilities(model=model, model_info=None)
+
+        self.assertEqual(capabilities["profile_id"], "sdxl_edit")
+        self.assertEqual(capabilities["backend_type"], "sdxl_native")
+        self.assertEqual(capabilities["sampler_strategy"], "standard_k")
+        self.assertEqual(capabilities["loader_strategy"], "sdxl_checkpoint")
 
     def test_resolve_edit_capabilities_coerces_string_overrides_to_false(self):
         plugin = load_plugin_package()

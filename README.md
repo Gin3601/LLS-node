@@ -208,10 +208,34 @@ node/
 ### Backend Selection
 
 - `backend_mode = auto | sdxl | flux`
-- `auto` 会根据 capability metadata 自动路由，找不到专业后端时直接报错，不会静默降级到旧的 Simple repair 逻辑
+- `auto` 现在使用 profile-driven routing：先解析模型 profile，再按 `backend_type` 自动路由
+- 找不到专业后端时直接报错，不会静默降级到旧的 Simple repair 逻辑
 - `sdxl` 和 `flux` 会强制指定后端，但仍然会验证当前模型是否兼容
 
-### Capability Requirements
+### Profile-Driven Routing
+
+LLS Simple Checkpoint Loader writes the resolved model profile into runtime metadata.
+
+- `LLS Pro Image Edit Prepare` routes by `backend_type`
+- `LLS Pro KSampler Bridge` routes by `sampler_strategy`
+
+重要 profile 字段：
+
+- `profile_id`
+- `backend_type`
+- `sampler_strategy`
+
+示例：
+
+- `sdxl_inpaint` -> `backend_type = sdxl_native`
+- `flux_edit` -> `backend_type = flux_edit`
+
+Base profile 不会再模糊地进入 Pro 链：
+
+- `SDXL` base 仍然保持 base profile，除非显式 override
+- `FLUX base models should remain on the Simple workflow unless they resolve to flux_edit`
+
+### Compatibility Metadata
 
 - `model_role`
 - `supports_inpaint_native`
@@ -223,13 +247,14 @@ node/
 - `model_info`
 - `LLS Simple Checkpoint Loader` 写入到对象上的 `_lls_*` 元信息
 - `utils/model_info.py` 里的 family / name 推断逻辑
+- profile resolver 对旧 capability tags 的兼容升级
 
 ### Adding new professional edit models
 
-1. 在 `utils/model_info.py` 里补充或修正角色与 capability 推断规则
-2. 确认 `LLS Simple Checkpoint Loader` 会把正确的 `_lls_*` capability tags 写到 `model` / `clip` / `vae`
-3. 优先用 `backend_mode=auto` 验证 capability metadata 是否足以自动识别
-4. 调试阶段可临时改用 `backend_mode=sdxl` 或 `backend_mode=flux`，快速确认显式路由是否匹配预期
+1. 在 `model_profiles/` 里补充或修正 profile rule
+2. 确认 `LLS Simple Checkpoint Loader` 会把正确的 `_lls_*` profile tags 写到 `model` / `clip` / `vae`
+3. 优先用 `backend_mode=auto` 验证 resolved profile 是否足以自动识别
+4. 调试阶段可通过 `model_info` 显式覆盖 `profile_id` / `backend_type` / `sampler_strategy`
 
 ### Notes
 

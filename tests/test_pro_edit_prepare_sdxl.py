@@ -36,6 +36,10 @@ class TestProEditPrepareSDXL(unittest.TestCase):
             supports_inpaint_native=True,
             supports_image_edit_native=False,
             preferred_edit_backend="sdxl",
+            profile_id="sdxl_inpaint",
+            backend_type="sdxl_native",
+            sampler_strategy="standard_k",
+            loader_strategy="sdxl_checkpoint",
         )
 
         latent, work_image, work_mask, edit_info, recommended, positive, negative = self.node.prepare(
@@ -66,8 +70,11 @@ class TestProEditPrepareSDXL(unittest.TestCase):
         )
 
         self.assertEqual(edit_info["backend_name"], "sdxl")
-        self.assertEqual(edit_info["routing_reason"], "model.preferred_edit_backend")
+        self.assertEqual(edit_info["routing_reason"], "profile.backend_type")
         self.assertEqual(edit_info["edit_scope"], "region")
+        self.assertEqual(edit_info["profile_id"], "sdxl_inpaint")
+        self.assertEqual(edit_info["backend_type"], "sdxl_native")
+        self.assertEqual(edit_info["sampler_strategy"], "standard_k")
         self.assertEqual(latent["source"], "pro_edit_prepare_region")
         self.assertIn("concat_latent_image", positive[0][1])
         self.assertIn("concat_mask", positive[0][1])
@@ -87,6 +94,10 @@ class TestProEditPrepareSDXL(unittest.TestCase):
             supports_inpaint_native=True,
             supports_image_edit_native=True,
             preferred_edit_backend="sdxl",
+            profile_id="sdxl_edit",
+            backend_type="sdxl_native",
+            sampler_strategy="standard_k",
+            loader_strategy="sdxl_checkpoint",
         )
 
         latent, work_image, work_mask, edit_info, recommended, positive, negative = self.node.prepare(
@@ -120,6 +131,9 @@ class TestProEditPrepareSDXL(unittest.TestCase):
         self.assertIsInstance(edit_info["crop_box"], list)
         self.assertEqual(edit_info["work_size"], [work_image.shape[2], work_image.shape[1]])
         self.assertEqual(edit_info["backend_name"], "sdxl")
+        self.assertEqual(edit_info["profile_id"], "sdxl_edit")
+        self.assertEqual(edit_info["backend_type"], "sdxl_native")
+        self.assertEqual(edit_info["sampler_strategy"], "standard_k")
         self.assertEqual(positive[0][1]["edit_backend"], "sdxl")
         self.assertEqual(negative[0][1]["edit_backend"], "sdxl")
         self.assertGreater(recommended, 0.0)

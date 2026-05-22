@@ -316,6 +316,10 @@ class FakeModel:
         supports_image_edit_native=False,
         preferred_edit_backend=None,
         model_name="demo-model.safetensors",
+        profile_id="",
+        backend_type="",
+        sampler_strategy="",
+        loader_strategy="",
     ):
         self._lls_family = family
         self._lls_model_role = model_role
@@ -323,6 +327,11 @@ class FakeModel:
         self._lls_supports_image_edit_native = supports_image_edit_native
         self._lls_preferred_edit_backend = preferred_edit_backend
         self._lls_model_name = model_name
+        self._lls_checkpoint_name = model_name
+        self._lls_profile_id = profile_id
+        self._lls_backend_type = backend_type
+        self._lls_sampler_strategy = sampler_strategy
+        self._lls_loader_strategy = loader_strategy
 
 
 def make_conditioning(label):

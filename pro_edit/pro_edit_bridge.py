@@ -20,6 +20,18 @@ from ..utils.model_info import (
 )
 
 
+def _apply_sampler_strategy(strategy: str, *, positive, negative, flux_guidance, defaults):
+    normalized = str(strategy or "").strip().lower() or "standard_k"
+    if normalized == "standard_k":
+        return positive, negative, None
+    if normalized == "flux_guided":
+        guidance_value = _normalize_flux_guidance(flux_guidance, defaults.get("default_guidance"))
+        positive = set_conditioning_values(positive, {"guidance": guidance_value})
+        negative = set_conditioning_values(negative, {"guidance": guidance_value})
+        return positive, negative, guidance_value
+    raise RuntimeError(f"[LLS] Unsupported sampler_strategy '{strategy}'.")
+
+
 class LLSProKSamplerBridge:
     CATEGORY = "LLS/Image Edit"
     FUNCTION = "sample"
@@ -82,13 +94,14 @@ class LLSProKSamplerBridge:
         elif model_info is None and normalized_model_family not in {"", "Auto", "auto"}:
             effective_model_info = {"family": normalized_model_family}
 
-        backend, routing = resolve_backend(
+        _, routing = resolve_backend(
             backend_mode,
             model=model,
             model_info=effective_model_info,
             edit_info=edit_info,
         )
-        defaults = get_family_defaults(routing.capabilities["model_family"])
+        profile = routing.profile
+        defaults = get_family_defaults(profile["family"])
 
         if quality_preset == FAMILY_DEFAULT_PRESET:
             steps = int(defaults["default_steps"])
@@ -97,7 +110,7 @@ class LLSProKSamplerBridge:
             scheduler = str(defaults["default_scheduler"])
             denoise = float(defaults["default_denoise"])
         else:
-            preset = get_sampling_preset({"family": routing.capabilities["model_family"]}, quality_preset)
+            preset = get_sampling_preset({"family": profile["family"]}, quality_preset)
             if preset is not None:
                 steps = int(preset["steps"])
                 cfg = float(preset["cfg"])
@@ -110,11 +123,13 @@ class LLSProKSamplerBridge:
         if denoise_mode == "auto_from_edit":
             actual_denoise = float(normalized_edit_info.get("recommended_denoise", actual_denoise))
 
-        guidance_value = None
-        if routing.backend_name == "flux":
-            guidance_value = _normalize_flux_guidance(flux_guidance, defaults.get("default_guidance"))
-            positive = set_conditioning_values(positive, {"guidance": guidance_value})
-            negative = set_conditioning_values(negative, {"guidance": guidance_value})
+        positive, negative, guidance_value = _apply_sampler_strategy(
+            profile["sampler_strategy"],
+            positive=positive,
+            negative=negative,
+            flux_guidance=flux_guidance,
+            defaults=defaults,
+        )
 
         actual_seed = random.randint(0, 0xFFFFFFFFFFFFFFFF) if int(seed) == -1 else int(seed)
         result_latent = _common_ksampler(
@@ -133,8 +148,11 @@ class LLSProKSamplerBridge:
             {
                 "backend_name": routing.backend_name,
                 "routing_reason": routing.routing_reason,
-                "family": routing.capabilities["model_family"],
-                "model_role": routing.capabilities["model_role"],
+                "family": profile["family"],
+                "model_role": profile["role"],
+                "profile_id": profile["profile_id"],
+                "backend_type": profile["backend_type"],
+                "sampler_strategy": profile["sampler_strategy"],
                 "seed": actual_seed,
                 "steps": int(steps),
                 "cfg": float(cfg),

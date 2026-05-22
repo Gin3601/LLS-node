@@ -34,9 +34,9 @@ except Exception as exc:
 else:
     _CORE_NODES_ERR = None
 
+from ..model_profiles.registry import resolve_model_profile
 from ..utils.model_info import (
     MODEL_FAMILY_CHOICES,
-    build_model_info,
     canonicalize_family,
     get_family_defaults,
     infer_family_from_name,
@@ -62,16 +62,25 @@ _FLUX_VAE_PATTERNS = ("ae.safetensors", "ae", "vae")
 
 
 def _build_capability_tags(model_name: str, family: str) -> dict[str, object]:
-    info = build_model_info(
+    profile = resolve_model_profile(
+        model=None,
+        model_info={
+            "checkpoint_name": model_name,
+            "model_name": model_name,
+            "family": family,
+        },
         checkpoint_name=model_name,
-        model_name=model_name,
         family=family,
     )
     return {
-        "model_role": info["model_role"],
-        "supports_inpaint_native": info["supports_inpaint_native"],
-        "supports_image_edit_native": info["supports_image_edit_native"],
-        "preferred_edit_backend": info["preferred_edit_backend"],
+        "profile_id": profile["profile_id"],
+        "backend_type": profile["backend_type"],
+        "sampler_strategy": profile["sampler_strategy"],
+        "loader_strategy": profile["loader_strategy"],
+        "model_role": profile["role"],
+        "supports_inpaint_native": profile["supports_inpaint_native"],
+        "supports_image_edit_native": profile["supports_image_edit_native"],
+        "preferred_edit_backend": profile["preferred_edit_backend"],
     }
 
 

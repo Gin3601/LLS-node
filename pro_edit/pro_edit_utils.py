@@ -49,6 +49,12 @@ def normalize_edit_info(edit_info):
     info = parse_jsonish_info(edit_info)
     info.setdefault("backend_name", "")
     info.setdefault("routing_reason", "")
+    info.setdefault("model_family", "SD1.5")
+    info.setdefault("model_role", "base")
+    info.setdefault("profile_id", "")
+    info.setdefault("backend_type", "none")
+    info.setdefault("sampler_strategy", "standard_k")
+    info.setdefault("loader_strategy", "")
     info.setdefault("edit_scope", "region")
     info.setdefault("edit_payload_version", "1.0")
     return info
@@ -224,14 +230,19 @@ def build_workspace(
 
 
 def build_edit_info(workspace: dict[str, Any], routing, *, backend_hints: dict[str, Any] | None = None) -> dict[str, Any]:
+    profile = routing.profile
     info = {
         "backend_name": routing.backend_name,
         "routing_reason": routing.routing_reason,
-        "model_family": routing.capabilities["model_family"],
-        "model_role": routing.capabilities["model_role"],
-        "supports_inpaint_native": routing.capabilities["supports_inpaint_native"],
-        "supports_image_edit_native": routing.capabilities["supports_image_edit_native"],
-        "preferred_edit_backend": routing.capabilities["preferred_edit_backend"],
+        "model_family": profile["family"],
+        "model_role": profile["role"],
+        "profile_id": profile["profile_id"],
+        "backend_type": profile["backend_type"],
+        "sampler_strategy": profile["sampler_strategy"],
+        "loader_strategy": profile["loader_strategy"],
+        "supports_inpaint_native": profile["supports_inpaint_native"],
+        "supports_image_edit_native": profile["supports_image_edit_native"],
+        "preferred_edit_backend": profile["preferred_edit_backend"],
         "edit_scope": workspace["edit_scope"],
         "original_size": list(workspace["original_size"]),
         "work_size": list(workspace["work_size"]),
