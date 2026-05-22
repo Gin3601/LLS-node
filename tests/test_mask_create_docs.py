@@ -11,11 +11,15 @@ class TestMaskCreateDocs(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("LLS Simple Mask Create", readme)
+        self.assertIn("LLS Simple Mask Preview", readme)
+        self.assertIn("image_width", readme)
+        self.assertIn("image_height", readme)
         self.assertIn("shape_type", readme)
         self.assertIn("coordinate_mode", readme)
         self.assertIn("area_info", readme)
-        self.assertIn("Load Image -> LLS Simple Mask Create -> LLS Simple Repair Prepare", readme)
-        self.assertIn("Load Image -> LLS Simple Mask Create -> LLS Simple Mask Draw", readme)
+        self.assertIn("LLS Simple Mask Create.mask -> LLS Simple Repair Prepare.mask", readme)
+        self.assertIn("LLS Simple Mask Create.mask_image -> Preview Image", readme)
+        self.assertIn("Load Image.image + LLS Simple Mask Create.mask -> LLS Simple Mask Preview", readme)
 
     def test_readme_lists_supported_shapes_and_combine_modes(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

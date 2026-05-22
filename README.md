@@ -81,6 +81,7 @@ node/
 `LLS-node` 现在提供一套面向本地工作流的修复链路，由以下节点组成：
 
 - `LLS Simple Mask Create`
+- `LLS Simple Mask Preview`
 - `LLS Simple Mask Draw`
 - `LLS Simple Repair Prepare`
 - `LLS Simple KSampler`
@@ -90,28 +91,30 @@ node/
 
 ### `LLS Simple Mask Create`
 
-`LLS Simple Mask Create` 是一个面向局部重绘的规则几何遮罩节点，用来根据输入图像尺寸快速创建 `rectangle`、`square`、`circle`、`ellipse` 四种基础 `mask`，并输出面积信息与叠加预览图。
+`LLS Simple Mask Create` 是一个基础几何遮罩生成节点。它不依赖原图内容，只根据输出尺寸和几何参数直接创建 `rectangle`、`square`、`circle`、`ellipse` 四种基础 `mask`。
 
-它适合放在手工绘制前或修复准备前：
+它适合放在修复准备前或手工绘制前：
 
-- `Load Image -> LLS Simple Mask Create -> Preview Image`
-- `Load Image -> LLS Simple Mask Create -> LLS Simple Repair Prepare`
-- `Load Image -> LLS Simple Mask Create -> LLS Simple Mask Draw`
-- `Load Image -> LLS Simple Mask Create -> LLS Simple Mask Draw -> LLS Simple Repair Prepare`
+- `LLS Simple Mask Create.mask_image -> Preview Image`
+- `Load Image.image + LLS Simple Mask Create.mask -> LLS Simple Mask Preview -> Preview Image`
+- `Load Image.image + LLS Simple Mask Create.mask -> LLS Simple Repair Prepare`
+- `LLS Simple Mask Create.mask -> LLS Simple Mask Draw.input_mask`
 
 **推荐连接方式：**
 
-- `Load Image.image -> LLS Simple Mask Create.image`
-- `LLS Simple Mask Create.image -> LLS Simple Repair Prepare.image`
+- `LLS Simple Mask Create.mask_image -> Preview Image`
+- `Load Image.image + LLS Simple Mask Create.mask -> LLS Simple Mask Preview`
+- `Load Image.image -> LLS Simple Repair Prepare.image`
 - `LLS Simple Mask Create.mask -> LLS Simple Repair Prepare.mask`
 - `LLS Simple Mask Create.mask -> LLS Simple Mask Draw.input_mask`
-- `LLS Simple Mask Create.image -> LLS Simple Mask Draw.image`
+- `Load Image.image -> LLS Simple Mask Draw.image`
 
 **输入：**
 
 | 名称 | 类型 | 说明 |
 |------|------|------|
-| `image` | `IMAGE` | 必填，原图输入，用于确定几何 mask 尺寸 |
+| `image_width` | `INT` | 必填，输出遮罩宽度 |
+| `image_height` | `INT` | 必填，输出遮罩高度 |
 | `input_mask` | `MASK` | 可选，已有遮罩；可与当前几何 mask 做 `replace` / `union` / `subtract` / `intersect` |
 
 **核心参数：**
@@ -127,16 +130,13 @@ node/
 | `blur` | 整体边缘模糊 |
 | `invert_mask` | 反转最终 mask |
 | `combine_mode` | `replace` / `union` / `subtract` / `intersect` |
-| `overlay_alpha` | 预览叠加透明度 |
-| `overlay_color` | `red` / `green` / `blue` |
 
 **输出：**
 
 | 名称 | 类型 | 说明 |
 |------|------|------|
-| `image` | `IMAGE` | 原图透传 |
 | `mask` | `MASK` | 最终遮罩，白色 / `1` 表示要重绘，黑色 / `0` 表示不重绘 |
-| `preview_image` | `IMAGE` | 原图与半透明彩色 mask 叠加后的预览图 |
+| `mask_image` | `IMAGE` | 将 `mask` 直接可视化为黑白图像，方便单独预览 |
 | `area_info` | `LLS_MASK_INFO` | 包含面积、占比、bbox、坐标模式等信息的 dict |
 
 `area_info` 主要包含：
@@ -165,12 +165,12 @@ node/
 - `coordinate_mode = percent`
 - `center_x = 0.5`
 - `center_y = 0.5`
+- `image_width = 1024`
+- `image_height = 1024`
 - `width = 0.3`
 - `height = 0.3`
 - `radius = 0.15`
 - `combine_mode = replace`
-- `overlay_alpha = 0.4`
-- `overlay_color = red`
 
 这会在图像中心创建一个大约占宽高 `30%` 的矩形 mask。
 
@@ -187,6 +187,30 @@ node/
 - 快速创建规则修复区域
 - 先创建基础几何区域，再交给 `LLS Simple Mask Draw` 手动修边
 - 为 `LLS Simple Repair Prepare` 提供稳定的初始局部重绘 mask
+
+### `LLS Simple Mask Preview`
+
+`LLS Simple Mask Preview` 只负责把 `image + mask` 做半透明叠加预览，不参与采样，也不修改原图。
+
+**推荐工作流：**
+
+- `Load Image.image + LLS Simple Mask Create.mask -> LLS Simple Mask Preview -> Preview Image`
+- `Load Image.image + LLS Simple Mask Draw.mask -> LLS Simple Mask Preview -> Preview Image`
+
+**输入：**
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| `image` | `IMAGE` | 必填，原图输入 |
+| `mask` | `MASK` | 必填，待预览的遮罩 |
+| `overlay_alpha` | `FLOAT` | 叠加透明度 |
+| `overlay_color` | `red / green / blue` | 叠加颜色 |
+
+**输出：**
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| `preview_image` | `IMAGE` | 原图与半透明彩色 mask 叠加后的预览图 |
 
 ### `LLS Simple Mask Draw`
 

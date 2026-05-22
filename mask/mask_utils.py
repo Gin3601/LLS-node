@@ -26,6 +26,35 @@ _OVERLAY_COLORS = {
 }
 
 
+def create_reference_image(
+    image_width: int,
+    image_height: int,
+    *,
+    batch: int = 1,
+    dtype=None,
+    device=None,
+):
+    _require_torch("[LLS] torch is required for mask generation.")
+
+    width = max(1, int(image_width))
+    height = max(1, int(image_height))
+    batch = max(1, int(batch))
+    kwargs = {"dtype": dtype or torch.float32}
+    if device is not None:
+        kwargs["device"] = device
+    return torch.zeros((batch, height, width, 3), **kwargs)
+
+
+def mask_to_image(mask):
+    _require_torch("[LLS] torch is required for mask image generation.")
+
+    shape = getattr(mask, "shape", None)
+    if not isinstance(shape, (list, tuple)) or len(shape) != 3:
+        raise RuntimeError("[LLS] mask must have shape [batch, height, width].")
+    normalized = mask.clamp(0.0, 1.0)
+    return normalized.unsqueeze(-1).repeat(1, 1, 1, 3)
+
+
 def get_image_size(image) -> tuple[int, int]:
     shape = getattr(image, "shape", None)
     if not isinstance(shape, (list, tuple)) or len(shape) != 4:

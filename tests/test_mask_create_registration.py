@@ -23,13 +23,16 @@ class TestMaskCreateRegistration(unittest.TestCase):
 
         self.assertEqual(node_cls.CATEGORY, "LLS/Mask")
         self.assertEqual(node_cls.FUNCTION, "create_mask")
-        self.assertEqual(node_cls.RETURN_TYPES, ("IMAGE", "MASK", "IMAGE", "LLS_MASK_INFO"))
-        self.assertEqual(node_cls.RETURN_NAMES, ("image", "mask", "preview_image", "area_info"))
+        self.assertEqual(node_cls.RETURN_TYPES, ("MASK", "IMAGE", "LLS_MASK_INFO"))
+        self.assertEqual(node_cls.RETURN_NAMES, ("mask", "mask_image", "area_info"))
 
         required = schema["required"]
         optional = schema["optional"]
 
-        self.assertEqual(required["image"], ("IMAGE",))
+        self.assertEqual(required["image_width"][0], "INT")
+        self.assertEqual(required["image_height"][0], "INT")
+        self.assertEqual(required["image_width"][1]["default"], 1024)
+        self.assertEqual(required["image_height"][1]["default"], 1024)
         self.assertEqual(optional["input_mask"], ("MASK",))
         self.assertEqual(required["shape_type"][0], ["rectangle", "square", "circle", "ellipse"])
         self.assertEqual(required["coordinate_mode"][0], ["pixel", "percent"])
@@ -46,10 +49,35 @@ class TestMaskCreateRegistration(unittest.TestCase):
         self.assertEqual(required["invert_mask"][0], "BOOLEAN")
         self.assertEqual(required["combine_mode"][0], ["replace", "union", "subtract", "intersect"])
         self.assertEqual(required["combine_mode"][1]["default"], "replace")
+        self.assertTrue(callable(getattr(node_cls, "create_mask", None)))
+
+    def test_plugin_registers_mask_preview_node(self):
+        plugin = load_plugin_package()
+
+        self.assertIn("LLSSimpleMaskPreview", plugin.NODE_CLASS_MAPPINGS)
+        self.assertEqual(
+            plugin.NODE_DISPLAY_NAME_MAPPINGS["LLSSimpleMaskPreview"],
+            "LLS Simple Mask Preview",
+        )
+
+    def test_mask_preview_schema_matches_contract(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimpleMaskPreview"]
+        schema = node_cls.INPUT_TYPES()
+
+        self.assertEqual(node_cls.CATEGORY, "LLS/Mask")
+        self.assertEqual(node_cls.FUNCTION, "preview_mask")
+        self.assertEqual(node_cls.RETURN_TYPES, ("IMAGE",))
+        self.assertEqual(node_cls.RETURN_NAMES, ("preview_image",))
+
+        required = schema["required"]
+
+        self.assertEqual(required["image"], ("IMAGE",))
+        self.assertEqual(required["mask"], ("MASK",))
         self.assertEqual(required["overlay_alpha"][0], "FLOAT")
         self.assertEqual(required["overlay_alpha"][1]["default"], 0.4)
         self.assertEqual(required["overlay_color"][0], ["red", "green", "blue"])
-        self.assertTrue(callable(getattr(node_cls, "create_mask", None)))
+        self.assertTrue(callable(getattr(node_cls, "preview_mask", None)))
 
 
 if __name__ == "__main__":
