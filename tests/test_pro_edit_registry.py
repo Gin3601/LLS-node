@@ -70,7 +70,7 @@ class TestProEditRegistry(unittest.TestCase):
         self.assertEqual(routing.routing_reason, "profile.backend_type")
         self.assertEqual(routing.profile["profile_id"], "sdxl_inpaint")
 
-    def test_manual_flux_override_rejects_sdxl_only_model(self):
+    def test_manual_flux_override_falls_back_to_profile_backend_for_sdxl_native_profile(self):
         model = FakeModel(
             family="SDXL",
             model_role="inpaint",
@@ -83,8 +83,12 @@ class TestProEditRegistry(unittest.TestCase):
             loader_strategy="sdxl_checkpoint",
         )
 
-        with self.assertRaisesRegex(RuntimeError, "backend 'flux' is incompatible with profile"):
-            self.registry.resolve_backend("flux", model=model)
+        backend, routing = self.registry.resolve_backend("flux", model=model)
+
+        self.assertEqual(backend.backend_name, "sdxl")
+        self.assertEqual(routing.routing_reason, "manual.incompatible_native_fallback")
+        self.assertEqual(routing.execution_path, "native_edit")
+        self.assertEqual(routing.profile["profile_id"], "sdxl_inpaint")
 
     def test_auto_routes_sdxl_base_profile_to_family_fallback(self):
         model = FakeModel(
@@ -144,6 +148,26 @@ class TestProEditRegistry(unittest.TestCase):
         self.assertEqual(backend.backend_name, "sdxl")
         self.assertEqual(routing.routing_reason, "manual.family_fallback")
         self.assertEqual(routing.execution_path, "fallback_repair")
+
+    def test_manual_flux_override_falls_back_to_generic_for_sd15_base_profile(self):
+        model = FakeModel(
+            family="SD1.5",
+            model_role="base",
+            supports_inpaint_native=False,
+            supports_image_edit_native=False,
+            preferred_edit_backend=None,
+            profile_id="sd15_base",
+            backend_type="none",
+            sampler_strategy="standard_k",
+            loader_strategy="sd15_checkpoint",
+        )
+
+        backend, routing = self.registry.resolve_backend("flux", model=model)
+
+        self.assertEqual(backend.backend_name, "generic")
+        self.assertEqual(routing.routing_reason, "manual.incompatible_family_fallback")
+        self.assertEqual(routing.execution_path, "fallback_repair")
+        self.assertEqual(routing.profile["profile_id"], "sd15_base")
 
 
 if __name__ == "__main__":

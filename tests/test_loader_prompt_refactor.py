@@ -815,17 +815,28 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(payload["size_source"], "input_image")
         self.assertEqual(payload["resize_mode"], "none")
 
-    def test_save_image_merges_metadata_from_native_objects_and_info_strings(self):
+    def test_save_image_schema_uses_info_strings_only(self):
+        plugin = load_plugin_package()
+        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSaveImage"]
+        required = node_cls.INPUT_TYPES()["required"]
+        optional = node_cls.INPUT_TYPES()["optional"]
+
+        self.assertEqual(required["image"][0], "IMAGE")
+        self.assertEqual(required["filename_prefix"][0], "STRING")
+        self.assertEqual(required["output_mode"][0], ["save", "preview_only"])
+        self.assertEqual(required["save_metadata"][0], "BOOLEAN")
+        self.assertNotIn("model", optional)
+        self.assertNotIn("clip", optional)
+        self.assertNotIn("vae", optional)
+        self.assertEqual(optional["prompt_info"], ("STRING", {"forceInput": True}))
+        self.assertEqual(optional["latent_info"], ("STRING", {"forceInput": True}))
+        self.assertEqual(optional["sample_info"], ("STRING", {"forceInput": True}))
+        self.assertEqual(optional["decode_info"], ("STRING", {"forceInput": True}))
+        self.assertEqual(optional["upscale_info"], ("STRING", {"forceInput": True}))
+
+    def test_save_image_merges_metadata_from_info_strings(self):
         load_plugin_package()
         from lls_node_test_refactor.image import nodes as image_nodes
-
-        model = TaggedValue("MODEL::SD15")
-        model._lls_family = "SD1.5"
-        model._lls_model_name = "sd15.safetensors"
-        clip = TaggedValue("CLIP::SD15")
-        clip._lls_text_encoder_name = "clip_l.safetensors"
-        vae = TaggedValue("VAE::SD15")
-        vae._lls_vae_name = "VAE::SD15"
 
         with mock.patch.object(image_nodes, "comfy_core_nodes", CoreNodesStub()):
             node = image_nodes.LLSSaveImage()
@@ -833,14 +844,13 @@ class TestLoaderPromptRefactor(unittest.TestCase):
                 image=FakeTensor((1, 512, 512, 3)),
                 filename_prefix="LLS",
                 save_metadata=True,
-                model=model,
-                clip=clip,
-                vae=vae,
                 prompt_info=json.dumps(
                     {
                         "positive_prompt": "cat",
                         "negative_prompt": "bad",
                         "model_family": "SD1.5",
+                        "checkpoint_name": "sd15.safetensors",
+                        "text_encoder_name": "clip_l.safetensors",
                     }
                 ),
                 sample_info=json.dumps(
@@ -854,12 +864,22 @@ class TestLoaderPromptRefactor(unittest.TestCase):
                         "denoise": 1.0,
                     }
                 ),
+                decode_info=json.dumps(
+                    {
+                        "vae_name": "VAE::SD15",
+                        "width": 512,
+                        "height": 512,
+                        "batch_size": 1,
+                    }
+                ),
                 upscale_info=json.dumps({"mode": "none", "scale": 1.0}),
             )
 
         metadata = result["ui"]["images"][0]["extra_pnginfo"]["lls_metadata"]
         self.assertEqual(metadata["positive_prompt"], "cat")
         self.assertEqual(metadata["checkpoint_name"], "sd15.safetensors")
+        self.assertEqual(metadata["text_encoder_name"], "clip_l.safetensors")
+        self.assertEqual(metadata["vae_name"], "VAE::SD15")
         self.assertEqual(metadata["steps"], 20)
         self.assertEqual(metadata["upscale_mode"], "none")
 

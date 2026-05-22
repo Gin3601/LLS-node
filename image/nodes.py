@@ -18,8 +18,6 @@ from ..utils.model_info import (
     info_to_json,
     parse_jsonish_info,
     resolve_model_family,
-    resolve_model_name,
-    resolve_text_encoder_names,
     resolve_vae_name,
 )
 
@@ -45,6 +43,13 @@ _SAVE_OUTPUT_MODES = ["save", "preview_only"]
 
 def _round_to_multiple(value: int, multiple: int) -> int:
     return max(multiple, ((int(value) + multiple - 1) // multiple) * multiple)
+
+
+def _first_non_empty(*values):
+    for value in values:
+        if value not in (None, ""):
+            return value
+    return ""
 
 
 def _get_image_dimensions(image) -> tuple[int, int, int]:
@@ -356,9 +361,6 @@ class LLSSaveImage:
                 "save_metadata": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "model": ("MODEL",),
-                "clip": ("CLIP",),
-                "vae": ("VAE",),
                 "prompt_info": ("STRING", {"forceInput": True}),
                 "latent_info": ("STRING", {"forceInput": True}),
                 "sample_info": ("STRING", {"forceInput": True}),
@@ -374,9 +376,6 @@ class LLSSaveImage:
     def _build_metadata(
         self,
         image,
-        model=None,
-        clip=None,
-        vae=None,
         prompt_info: str | None = None,
         latent_info: str | None = None,
         sample_info: str | None = None,
@@ -389,19 +388,31 @@ class LLSSaveImage:
         decode = parse_jsonish_info(decode_info)
         upscale = parse_jsonish_info(upscale_info)
 
-        family = prompt.get("model_family") or latent.get("model_family") or decode.get("model_family")
-        if not family:
-            family = resolve_model_family("Auto", model=model, clip=clip)
-
-        text_encoder_name = resolve_text_encoder_names(clip).get("text_encoder_name", "")
-        checkpoint_name = resolve_model_name(
-            model=model,
-            clip=clip,
-            fallback=prompt.get("checkpoint_name") or latent.get("checkpoint_name") or decode.get("checkpoint_name") or "",
+        family = _first_non_empty(
+            prompt.get("model_family"),
+            latent.get("model_family"),
+            decode.get("model_family"),
+            sample.get("model_family"),
+            sample.get("family"),
         )
-        vae_name = resolve_vae_name(
-            vae,
-            fallback=decode.get("vae_name") or latent.get("vae_name") or "",
+        checkpoint_name = _first_non_empty(
+            prompt.get("checkpoint_name"),
+            latent.get("checkpoint_name"),
+            decode.get("checkpoint_name"),
+            sample.get("checkpoint_name"),
+            sample.get("model_name"),
+        )
+        text_encoder_name = _first_non_empty(
+            prompt.get("text_encoder_name"),
+            prompt.get("text_encoder_name_1"),
+            prompt.get("text_encoder_name_2"),
+            latent.get("text_encoder_name"),
+            decode.get("text_encoder_name"),
+        )
+        vae_name = _first_non_empty(
+            decode.get("vae_name"),
+            latent.get("vae_name"),
+            prompt.get("vae_name"),
         )
 
         metadata = {
@@ -433,9 +444,6 @@ class LLSSaveImage:
         filename_prefix: str = "LLS",
         output_mode: str = "save",
         save_metadata: bool = True,
-        model=None,
-        clip=None,
-        vae=None,
         prompt_info: str | None = None,
         latent_info: str | None = None,
         sample_info: str | None = None,
@@ -462,9 +470,6 @@ class LLSSaveImage:
         if save_metadata:
             merged_extra_pnginfo["lls_metadata"] = self._build_metadata(
                 image=image,
-                model=model,
-                clip=clip,
-                vae=vae,
                 prompt_info=prompt_info,
                 latent_info=latent_info,
                 sample_info=sample_info,

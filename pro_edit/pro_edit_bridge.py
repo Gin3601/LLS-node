@@ -1,171 +1,138 @@
 from __future__ import annotations
 
-import random
+import importlib
 
-from .backends.registry import resolve_backend
-from .pro_edit_utils import BACKEND_MODE_CHOICES, normalize_edit_info, set_conditioning_values
-from ..sampling.nodes import (
-    _QUALITY_PRESETS,
-    _common_ksampler,
-    _get_samplers,
-    _get_schedulers,
-    _normalize_flux_guidance,
-)
-from ..utils.model_info import (
-    FAMILY_DEFAULT_PRESET,
-    MODEL_FAMILY_CHOICES,
-    get_family_defaults,
-    get_sampling_preset,
-    info_to_json,
-)
+from ..sampling.nodes import _common_ksampler, _get_samplers, _get_schedulers
+
+try:
+    comfy_core_nodes = importlib.import_module("nodes")
+except Exception:
+    comfy_core_nodes = None
 
 
-def _apply_sampler_strategy(strategy: str, *, positive, negative, flux_guidance, defaults):
-    normalized = str(strategy or "").strip().lower() or "standard_k"
-    if normalized == "standard_k":
-        return positive, negative, None
-    if normalized == "flux_guided":
-        guidance_value = _normalize_flux_guidance(flux_guidance, defaults.get("default_guidance"))
-        positive = set_conditioning_values(positive, {"guidance": guidance_value})
-        negative = set_conditioning_values(negative, {"guidance": guidance_value})
-        return positive, negative, guidance_value
-    raise RuntimeError(f"[LLS] Unsupported sampler_strategy '{strategy}'.")
+def _run_native_ksampler_advanced(
+    model,
+    add_noise,
+    noise_seed,
+    steps,
+    cfg,
+    sampler_name,
+    scheduler,
+    positive,
+    negative,
+    latent_image,
+    start_at_step,
+    end_at_step,
+    return_with_leftover_noise,
+    denoise,
+):
+    if comfy_core_nodes is None or not hasattr(comfy_core_nodes, "KSamplerAdvanced"):
+        return None
+
+    sampler = comfy_core_nodes.KSamplerAdvanced()
+    result = sampler.sample(
+        model=model,
+        add_noise=add_noise,
+        noise_seed=int(noise_seed),
+        steps=int(steps),
+        cfg=float(cfg),
+        sampler_name=sampler_name,
+        scheduler=scheduler,
+        positive=positive,
+        negative=negative,
+        latent_image=latent_image,
+        start_at_step=int(start_at_step),
+        end_at_step=int(end_at_step),
+        return_with_leftover_noise=return_with_leftover_noise,
+        denoise=float(denoise),
+    )
+    if isinstance(result, tuple):
+        return result[0]
+    if isinstance(result, list):
+        return result[0]
+    return result
 
 
 class LLSProKSamplerBridge:
     CATEGORY = "LLS/Image Edit"
     FUNCTION = "sample"
-    RETURN_TYPES = ("LATENT", "STRING")
-    RETURN_NAMES = ("latent", "sample_info")
+    RETURN_TYPES = ("LATENT",)
+    RETURN_NAMES = ("latent",)
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "model": ("MODEL",),
+                "add_noise": (["enable", "disable"], {"advanced": True}),
+                "noise_seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "control_after_generate": True}),
+                "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
+                "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.01}),
+                "sampler_name": (_get_samplers(),),
+                "scheduler": (_get_schedulers(),),
                 "positive": ("CONDITIONING",),
                 "negative": ("CONDITIONING",),
                 "latent_image": ("LATENT",),
-                "backend_mode": (BACKEND_MODE_CHOICES, {"default": "auto"}),
-                "quality_preset": (_QUALITY_PRESETS, {"default": FAMILY_DEFAULT_PRESET}),
-                "seed": ("INT", {"default": -1, "min": -1, "max": 0xFFFFFFFFFFFFFFFF}),
-                "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
-                "cfg": ("FLOAT", {"default": 7.0, "min": 0.0, "max": 100.0, "step": 0.1}),
-                "sampler_name": (_get_samplers(), {"default": "euler"}),
-                "scheduler": (_get_schedulers(), {"default": "normal"}),
-                "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "denoise_mode": (["manual", "auto_from_edit"], {"default": "manual"}),
-                "flux_guidance": ("STRING,FLOAT,INT", {"default": 3.5, "widgetType": "FLOAT"}),
-                "model_family": (MODEL_FAMILY_CHOICES, {"default": "Auto"}),
-            },
-            "optional": {
-                "edit_info": ("LLS_EDIT_INFO",),
-                "model_info": ("STRING",),
-            },
+                "start_at_step": ("INT", {"default": 0, "min": 0, "max": 10000, "advanced": True}),
+                "end_at_step": ("INT", {"default": 10000, "min": 0, "max": 10000, "advanced": True}),
+                "return_with_leftover_noise": (["disable", "enable"], {"advanced": True}),
+            }
         }
 
     def sample(
         self,
         model,
-        positive,
-        negative,
-        latent_image,
-        backend_mode,
-        quality_preset,
-        seed,
+        add_noise,
+        noise_seed,
         steps,
         cfg,
         sampler_name,
         scheduler,
-        denoise,
-        denoise_mode,
-        flux_guidance,
-        model_family,
-        edit_info=None,
-        model_info=None,
+        positive,
+        negative,
+        latent_image,
+        start_at_step,
+        end_at_step,
+        return_with_leftover_noise,
+        denoise=1.0,
     ):
-        effective_model_info = model_info
-        normalized_model_family = str(model_family or "").strip()
-        if isinstance(model_info, dict):
-            effective_model_info = dict(model_info)
-            if normalized_model_family not in {"", "Auto", "auto"}:
-                effective_model_info.setdefault("family", normalized_model_family)
-                effective_model_info.setdefault("model_family", normalized_model_family)
-        elif model_info is None and normalized_model_family not in {"", "Auto", "auto"}:
-            effective_model_info = {"family": normalized_model_family}
-
-        _, routing = resolve_backend(
-            backend_mode,
+        result_latent = _run_native_ksampler_advanced(
             model=model,
-            model_info=effective_model_info,
-            edit_info=edit_info,
-        )
-        profile = routing.profile
-        defaults = get_family_defaults(profile["family"])
-
-        if quality_preset == FAMILY_DEFAULT_PRESET:
-            steps = int(defaults["default_steps"])
-            cfg = float(defaults["default_cfg"])
-            sampler_name = str(defaults["default_sampler"])
-            scheduler = str(defaults["default_scheduler"])
-            denoise = float(defaults["default_denoise"])
-        else:
-            preset = get_sampling_preset({"family": profile["family"]}, quality_preset)
-            if preset is not None:
-                steps = int(preset["steps"])
-                cfg = float(preset["cfg"])
-                sampler_name = str(preset["sampler_name"])
-                scheduler = str(preset["scheduler"])
-                denoise = float(preset["denoise"])
-
-        normalized_edit_info = normalize_edit_info(edit_info)
-        actual_denoise = float(denoise)
-        if denoise_mode == "auto_from_edit":
-            actual_denoise = float(normalized_edit_info.get("recommended_denoise", actual_denoise))
-
-        positive, negative, guidance_value = _apply_sampler_strategy(
-            profile["sampler_strategy"],
-            positive=positive,
-            negative=negative,
-            flux_guidance=flux_guidance,
-            defaults=defaults,
-        )
-
-        actual_seed = random.randint(0, 0xFFFFFFFFFFFFFFFF) if int(seed) == -1 else int(seed)
-        result_latent = _common_ksampler(
-            model=model,
-            seed=actual_seed,
-            steps=int(steps),
-            cfg=float(cfg),
+            add_noise=add_noise,
+            noise_seed=noise_seed,
+            steps=steps,
+            cfg=cfg,
             sampler_name=sampler_name,
             scheduler=scheduler,
             positive=positive,
             negative=negative,
-            latent=latent_image,
-            denoise=actual_denoise,
+            latent_image=latent_image,
+            start_at_step=start_at_step,
+            end_at_step=end_at_step,
+            return_with_leftover_noise=return_with_leftover_noise,
+            denoise=denoise,
         )
-        sample_info = info_to_json(
-            {
-                "backend_name": routing.backend_name,
-                "routing_reason": routing.routing_reason,
-                "execution_path": routing.execution_path,
-                "family": profile["family"],
-                "model_role": profile["role"],
-                "profile_id": profile["profile_id"],
-                "backend_type": profile["backend_type"],
-                "sampler_strategy": profile["sampler_strategy"],
-                "seed": actual_seed,
-                "steps": int(steps),
-                "cfg": float(cfg),
-                "guidance": guidance_value,
-                "sampler_name": sampler_name,
-                "scheduler": scheduler,
-                "denoise": actual_denoise,
-                "denoise_mode": denoise_mode,
-                "quality_preset": quality_preset,
-            }
-        )
-        return result_latent, sample_info
+        if result_latent is None:
+            force_full_denoise = str(return_with_leftover_noise or "disable") != "enable"
+            disable_noise = str(add_noise or "enable") == "disable"
+
+            result_latent = _common_ksampler(
+                model=model,
+                seed=int(noise_seed),
+                steps=int(steps),
+                cfg=float(cfg),
+                sampler_name=sampler_name,
+                scheduler=scheduler,
+                positive=positive,
+                negative=negative,
+                latent=latent_image,
+                denoise=float(denoise),
+                disable_noise=disable_noise,
+                start_step=int(start_at_step),
+                last_step=int(end_at_step),
+                force_full_denoise=force_full_denoise,
+            )
+        return (result_latent,)
 
 
 NODE_CLASS_MAPPINGS = {"LLSProKSamplerBridge": LLSProKSamplerBridge}

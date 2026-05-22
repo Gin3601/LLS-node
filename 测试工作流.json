@@ -1533,12 +1533,6 @@
           "name": "latent_image",
           "type": "LATENT",
           "link": 105
-        },
-        {
-          "name": "edit_info",
-          "shape": 7,
-          "type": "LLS_EDIT_INFO",
-          "link": 118
         }
       ],
       "outputs": [
@@ -1548,11 +1542,6 @@
           "links": [
             121
           ]
-        },
-        {
-          "name": "sample_info",
-          "type": "STRING",
-          "links": null
         }
       ],
       "properties": {
@@ -1561,19 +1550,16 @@
         "Node name for S&R": "LLSProKSamplerBridge"
       },
       "widgets_values": [
-        "auto",
-        "Manual",
+        "enable",
         54136361244841,
         "randomize",
         20,
         1,
         "euler",
         "simple",
-        1,
-        "manual",
-        3.5,
-        "Auto",
-        ""
+        0,
+        10000,
+        "disable"
       ]
     },
     {
@@ -1817,7 +1803,6 @@
           "name": "edit_info",
           "type": "LLS_EDIT_INFO",
           "links": [
-            118,
             119
           ]
         },
@@ -2347,14 +2332,6 @@
       67,
       4,
       "CONDITIONING"
-    ],
-    [
-      118,
-      67,
-      3,
-      68,
-      4,
-      "LLS_EDIT_INFO"
     ],
     [
       119,

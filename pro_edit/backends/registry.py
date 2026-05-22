@@ -87,6 +87,40 @@ def _resolve_fallback_backend_name(family: str) -> str:
     return "generic"
 
 
+def _build_routing_result(backend, *, routing_reason, capabilities, profile, execution_path):
+    return backend, RoutingResult(
+        backend.backend_name,
+        routing_reason,
+        capabilities,
+        profile,
+        execution_path,
+    )
+
+
+def _resolve_profile_route(*, profile, capabilities, native_backend_name):
+    if native_backend_name is not None:
+        backend = get_backend(native_backend_name)
+        validate_manual_backend(native_backend_name, backend, profile)
+        return _build_routing_result(
+            backend,
+            routing_reason="profile.backend_type",
+            capabilities=capabilities,
+            profile=profile,
+            execution_path="native_edit",
+        )
+
+    fallback_backend_name = _resolve_fallback_backend_name(str(profile.get("family") or ""))
+    backend = get_backend(fallback_backend_name)
+    validate_manual_backend(fallback_backend_name, backend, profile)
+    return _build_routing_result(
+        backend,
+        routing_reason="profile.family_fallback",
+        capabilities=capabilities,
+        profile=profile,
+        execution_path="fallback_repair",
+    )
+
+
 def resolve_backend(backend_mode: str, *, model=None, model_info=None, edit_info=None):
     _ensure_builtin_backends()
     mode = str(backend_mode or "auto").strip().lower() or "auto"
@@ -105,17 +139,38 @@ def resolve_backend(backend_mode: str, *, model=None, model_info=None, edit_info
 
     if mode != "auto":
         backend = get_backend(mode)
-        validate_manual_backend(mode, backend, profile)
-        routing_reason = "manual.override" if native_backend_name is not None else "manual.family_fallback"
-        execution_path = "native_edit" if native_backend_name is not None else "fallback_repair"
-        return backend, RoutingResult(backend.backend_name, routing_reason, capabilities, profile, execution_path)
+        if backend.supports(profile):
+            routing_reason = "manual.override" if native_backend_name is not None else "manual.family_fallback"
+            execution_path = "native_edit" if native_backend_name is not None else "fallback_repair"
+            validate_manual_backend(mode, backend, profile)
+            return _build_routing_result(
+                backend,
+                routing_reason=routing_reason,
+                capabilities=capabilities,
+                profile=profile,
+                execution_path=execution_path,
+            )
 
-    if native_backend_name is not None:
-        backend = get_backend(native_backend_name)
-        validate_manual_backend(native_backend_name, backend, profile)
-        return backend, RoutingResult(backend.backend_name, "profile.backend_type", capabilities, profile, "native_edit")
+        backend, routed = _resolve_profile_route(
+            profile=profile,
+            capabilities=capabilities,
+            native_backend_name=native_backend_name,
+        )
+        fallback_reason = (
+            "manual.incompatible_native_fallback"
+            if routed.execution_path == "native_edit"
+            else "manual.incompatible_family_fallback"
+        )
+        return _build_routing_result(
+            backend,
+            routing_reason=fallback_reason,
+            capabilities=capabilities,
+            profile=profile,
+            execution_path=routed.execution_path,
+        )
 
-    fallback_backend_name = _resolve_fallback_backend_name(str(profile.get("family") or ""))
-    backend = get_backend(fallback_backend_name)
-    validate_manual_backend(fallback_backend_name, backend, profile)
-    return backend, RoutingResult(backend.backend_name, "profile.family_fallback", capabilities, profile, "fallback_repair")
+    return _resolve_profile_route(
+        profile=profile,
+        capabilities=capabilities,
+        native_backend_name=native_backend_name,
+    )

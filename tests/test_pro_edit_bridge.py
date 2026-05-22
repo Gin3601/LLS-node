@@ -1,4 +1,3 @@
-import json
 import unittest
 from unittest import mock
 
@@ -14,233 +13,87 @@ class TestProEditBridge(unittest.TestCase):
         self.bridge_module = import_plugin_submodule(self.plugin, "pro_edit.pro_edit_bridge")
         self.node = self.bridge_module.LLSProKSamplerBridge()
 
-    def test_bridge_uses_auto_from_edit_denoise(self):
-        model = FakeModel(
-            family="SDXL",
-            model_role="inpaint",
-            supports_inpaint_native=True,
-            supports_image_edit_native=False,
-            preferred_edit_backend="sdxl",
-            profile_id="sdxl_inpaint",
-            backend_type="sdxl_native",
-            sampler_strategy="standard_k",
-            loader_strategy="sdxl_checkpoint",
-        )
+    def test_bridge_prefers_native_advanced_ksampler_when_available(self):
+        model = FakeModel()
+        positive = make_conditioning("positive")
+        negative = make_conditioning("negative")
         latent = {"samples": FakeLatentTensor((1, 4, 64, 64)), "source": "pro_edit_prepare_region"}
+        captured = {}
+        native_result = {"samples": FakeLatentTensor((1, 4, 64, 64)), "source": "native"}
 
-        with mock.patch.object(self.bridge_module, "_common_ksampler", side_effect=lambda **kwargs: kwargs["latent"]):
-            result_latent, sample_info_json = self.node.sample(
+        class NativeKSamplerAdvanced:
+            def sample(self, **kwargs):
+                captured.update(kwargs)
+                return (native_result,)
+
+        with mock.patch.object(self.bridge_module, "comfy_core_nodes", mock.Mock(KSamplerAdvanced=NativeKSamplerAdvanced)), mock.patch.object(
+            self.bridge_module,
+            "_common_ksampler",
+            side_effect=AssertionError("_common_ksampler should not be used when native KSamplerAdvanced is available"),
+        ):
+            (result_latent,) = self.node.sample(
                 model=model,
-                positive=make_conditioning("positive"),
-                negative=make_conditioning("negative"),
-                latent_image=latent,
-                backend_mode="auto",
-                quality_preset="Manual",
-                seed=7,
+                add_noise="disable",
+                noise_seed=11,
                 steps=20,
                 cfg=7.0,
                 sampler_name="euler",
                 scheduler="normal",
-                denoise=0.25,
-                denoise_mode="auto_from_edit",
-                flux_guidance=3.5,
-                model_family="Auto",
-                edit_info={
-                    "backend_name": "sdxl",
-                    "model_family": "SDXL",
-                    "model_role": "inpaint",
-                    "supports_inpaint_native": True,
-                    "supports_image_edit_native": False,
-                    "preferred_edit_backend": "sdxl",
-                    "profile_id": "sdxl_inpaint",
-                    "backend_type": "sdxl_native",
-                    "sampler_strategy": "standard_k",
-                    "recommended_denoise": 0.63,
-                },
-                model_info=None,
+                positive=positive,
+                negative=negative,
+                latent_image=latent,
+                start_at_step=3,
+                end_at_step=17,
+                return_with_leftover_noise="enable",
             )
 
-        sample_info = json.loads(sample_info_json)
-        self.assertEqual(result_latent["source"], "pro_edit_prepare_region")
-        self.assertEqual(sample_info["backend_name"], "sdxl")
-        self.assertEqual(sample_info["profile_id"], "sdxl_inpaint")
-        self.assertEqual(sample_info["sampler_strategy"], "standard_k")
-        self.assertEqual(sample_info["denoise"], 0.63)
-        self.assertEqual(sample_info["denoise_mode"], "auto_from_edit")
+        self.assertIs(result_latent, native_result)
+        self.assertIs(captured["model"], model)
+        self.assertIs(captured["positive"], positive)
+        self.assertIs(captured["negative"], negative)
+        self.assertIs(captured["latent_image"], latent)
+        self.assertEqual(captured["noise_seed"], 11)
+        self.assertEqual(captured["steps"], 20)
+        self.assertEqual(captured["cfg"], 7.0)
+        self.assertEqual(captured["sampler_name"], "euler")
+        self.assertEqual(captured["scheduler"], "normal")
+        self.assertEqual(captured["denoise"], 1.0)
+        self.assertEqual(captured["add_noise"], "disable")
+        self.assertEqual(captured["start_at_step"], 3)
+        self.assertEqual(captured["end_at_step"], 17)
+        self.assertEqual(captured["return_with_leftover_noise"], "enable")
 
-    def test_bridge_applies_flux_guidance_for_flux_backend(self):
-        model = FakeModel(
-            family="FLUX_DEV",
-            model_role="edit",
-            supports_inpaint_native=False,
-            supports_image_edit_native=True,
-            preferred_edit_backend="flux",
-            profile_id="flux_edit",
-            backend_type="flux_edit",
-            sampler_strategy="flux_guided",
-            loader_strategy="flux_split_or_bundle",
-        )
-        latent = {"samples": FakeLatentTensor((1, 16, 64, 64)), "source": "pro_edit_prepare_region"}
+    def test_bridge_falls_back_to_common_ksampler_without_native_node(self):
+        latent = {"samples": FakeLatentTensor((1, 4, 64, 64))}
+        captured = {}
 
-        with mock.patch.object(self.bridge_module, "_common_ksampler", side_effect=lambda **kwargs: kwargs["latent"]):
-            _, sample_info_json = self.node.sample(
-                model=model,
+        def fake_common_ksampler(**kwargs):
+            captured.update(kwargs)
+            return kwargs["latent"]
+
+        with mock.patch.object(self.bridge_module, "comfy_core_nodes", None), mock.patch.object(
+            self.bridge_module,
+            "_common_ksampler",
+            side_effect=fake_common_ksampler,
+        ):
+            (_result_latent,) = self.node.sample(
+                model=FakeModel(),
+                add_noise="enable",
+                noise_seed=21,
+                steps=10,
+                cfg=5.5,
+                sampler_name="heun",
+                scheduler="karras",
                 positive=make_conditioning("positive"),
                 negative=make_conditioning("negative"),
                 latent_image=latent,
-                backend_mode="auto",
-                quality_preset="Manual",
-                seed=9,
-                steps=12,
-                cfg=1.0,
-                sampler_name="euler",
-                scheduler="simple",
-                denoise=0.8,
-                denoise_mode="manual",
-                flux_guidance=4.2,
-                model_family="Auto",
-                edit_info={
-                    "backend_name": "flux",
-                    "model_family": "FLUX_DEV",
-                    "model_role": "edit",
-                    "supports_inpaint_native": False,
-                    "supports_image_edit_native": True,
-                    "preferred_edit_backend": "flux",
-                    "profile_id": "flux_edit",
-                    "backend_type": "flux_edit",
-                    "sampler_strategy": "flux_guided",
-                    "recommended_denoise": 0.8,
-                },
-                model_info=None,
+                start_at_step=0,
+                end_at_step=10000,
+                return_with_leftover_noise="disable",
             )
 
-        sample_info = json.loads(sample_info_json)
-        self.assertEqual(sample_info["backend_name"], "flux")
-        self.assertEqual(sample_info["profile_id"], "flux_edit")
-        self.assertEqual(sample_info["sampler_strategy"], "flux_guided")
-        self.assertEqual(sample_info["guidance"], 4.2)
-
-    def test_bridge_manual_backend_mismatch_raises(self):
-        model = FakeModel(
-            family="SDXL",
-            model_role="inpaint",
-            supports_inpaint_native=True,
-            supports_image_edit_native=False,
-            preferred_edit_backend="sdxl",
-            profile_id="sdxl_inpaint",
-            backend_type="sdxl_native",
-            sampler_strategy="standard_k",
-            loader_strategy="sdxl_checkpoint",
-        )
-        latent = {"samples": FakeLatentTensor((1, 4, 64, 64)), "source": "pro_edit_prepare_region"}
-
-        with self.assertRaisesRegex(RuntimeError, "backend 'flux' is incompatible"):
-            self.node.sample(
-                model=model,
-                positive=make_conditioning("positive"),
-                negative=make_conditioning("negative"),
-                latent_image=latent,
-                backend_mode="flux",
-                quality_preset="Manual",
-                seed=11,
-                steps=20,
-                cfg=7.0,
-                sampler_name="euler",
-                scheduler="normal",
-                denoise=0.5,
-                denoise_mode="manual",
-                flux_guidance=3.5,
-                model_family="Auto",
-                edit_info=None,
-                model_info=None,
-            )
-
-    def test_bridge_rejects_unknown_sampler_strategy(self):
-        model = FakeModel(
-            family="FLUX_DEV",
-            model_role="edit",
-            supports_inpaint_native=False,
-            supports_image_edit_native=True,
-            preferred_edit_backend="flux",
-            profile_id="flux_edit",
-            backend_type="flux_edit",
-            sampler_strategy="mystery_strategy",
-            loader_strategy="flux_split_or_bundle",
-        )
-        latent = {"samples": FakeLatentTensor((1, 16, 64, 64)), "source": "pro_edit_prepare_region"}
-
-        with self.assertRaisesRegex(RuntimeError, "Unsupported sampler_strategy 'mystery_strategy'"):
-            self.node.sample(
-                model=model,
-                positive=make_conditioning("positive"),
-                negative=make_conditioning("negative"),
-                latent_image=latent,
-                backend_mode="auto",
-                quality_preset="Manual",
-                seed=9,
-                steps=12,
-                cfg=1.0,
-                sampler_name="euler",
-                scheduler="simple",
-                denoise=0.8,
-                denoise_mode="manual",
-                flux_guidance=4.2,
-                model_family="Auto",
-                edit_info=None,
-                model_info=None,
-            )
-
-    def test_bridge_routes_base_profile_through_fallback_execution_path(self):
-        model = FakeModel(
-            family="SDXL",
-            model_role="base",
-            supports_inpaint_native=False,
-            supports_image_edit_native=False,
-            preferred_edit_backend=None,
-            profile_id="sdxl_base",
-            backend_type="none",
-            sampler_strategy="standard_k",
-            loader_strategy="sdxl_checkpoint",
-        )
-        latent = {
-            "samples": FakeLatentTensor((1, 4, 64, 64)),
-            "noise_mask": FakeLatentTensor((1, 4, 64, 64)),
-            "source": "pro_edit_fallback_region",
-        }
-
-        with mock.patch.object(self.bridge_module, "_common_ksampler", side_effect=lambda **kwargs: kwargs["latent"]):
-            result_latent, sample_info_json = self.node.sample(
-                model=model,
-                positive=make_conditioning("positive"),
-                negative=make_conditioning("negative"),
-                latent_image=latent,
-                backend_mode="auto",
-                quality_preset="Manual",
-                seed=13,
-                steps=20,
-                cfg=7.0,
-                sampler_name="euler",
-                scheduler="normal",
-                denoise=0.4,
-                denoise_mode="manual",
-                flux_guidance=3.5,
-                model_family="Auto",
-                edit_info={
-                    "backend_name": "sdxl",
-                    "profile_id": "sdxl_base",
-                    "backend_type": "none",
-                    "sampler_strategy": "standard_k",
-                    "execution_path": "fallback_repair",
-                    "recommended_denoise": 0.4,
-                },
-                model_info=None,
-            )
-
-        sample_info = json.loads(sample_info_json)
-        self.assertEqual(result_latent["source"], "pro_edit_fallback_region")
-        self.assertEqual(sample_info["backend_name"], "sdxl")
-        self.assertEqual(sample_info["profile_id"], "sdxl_base")
-        self.assertEqual(sample_info["execution_path"], "fallback_repair")
+        self.assertFalse(captured["disable_noise"])
+        self.assertTrue(captured["force_full_denoise"])
 
 
 if __name__ == "__main__":

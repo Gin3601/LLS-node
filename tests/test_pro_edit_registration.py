@@ -86,35 +86,32 @@ class TestProEditRegistration(unittest.TestCase):
         bridge_cls = plugin.NODE_CLASS_MAPPINGS["LLSProKSamplerBridge"]
         bridge_schema = bridge_cls.INPUT_TYPES()
         bridge_required = bridge_schema["required"]
-        bridge_optional = bridge_schema["optional"]
+        bridge_optional = bridge_schema.get("optional", {})
         self.assertEqual(bridge_cls.CATEGORY, "LLS/Image Edit")
         self.assertEqual(bridge_cls.FUNCTION, "sample")
-        self.assertEqual(bridge_cls.RETURN_TYPES, ("LATENT", "STRING"))
-        self.assertEqual(bridge_cls.RETURN_NAMES, ("latent", "sample_info"))
+        self.assertEqual(bridge_cls.RETURN_TYPES, ("LATENT",))
+        self.assertEqual(bridge_cls.RETURN_NAMES, ("latent",))
         self.assertEqual(
             set(bridge_required),
             {
                 "model",
-                "positive",
-                "negative",
-                "latent_image",
-                "backend_mode",
-                "quality_preset",
-                "seed",
+                "add_noise",
+                "noise_seed",
                 "steps",
                 "cfg",
                 "sampler_name",
                 "scheduler",
-                "denoise",
-                "denoise_mode",
-                "flux_guidance",
-                "model_family",
+                "positive",
+                "negative",
+                "latent_image",
+                "start_at_step",
+                "end_at_step",
+                "return_with_leftover_noise",
             },
         )
-        self.assertEqual(bridge_required["backend_mode"][0], ["auto", "sdxl", "flux"])
-        self.assertEqual(bridge_required["denoise_mode"][0], ["manual", "auto_from_edit"])
-        self.assertEqual(bridge_optional["edit_info"], ("LLS_EDIT_INFO",))
-        self.assertEqual(bridge_optional["model_info"], ("STRING",))
+        self.assertEqual(bridge_required["add_noise"][0], ["enable", "disable"])
+        self.assertEqual(bridge_required["return_with_leftover_noise"][0], ["disable", "enable"])
+        self.assertEqual(bridge_optional, {})
 
         finish_cls = plugin.NODE_CLASS_MAPPINGS["LLSProImageEditFinish"]
         finish_schema = finish_cls.INPUT_TYPES()
