@@ -10,6 +10,7 @@ class RoutingResult:
     routing_reason: str
     capabilities: dict[str, Any]
     profile: dict[str, Any]
+    execution_path: str
 
 
 class ProEditBackend(Protocol):

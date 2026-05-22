@@ -20,8 +20,9 @@ class TestProEditDocs(unittest.TestCase):
             "profile_id",
             "backend_type",
             "sampler_strategy",
+            "execution_path",
             "LLS Simple Checkpoint Loader writes the resolved model profile",
-            "FLUX base models should remain on the Simple workflow unless they resolve to flux_edit",
+            "base profiles automatically fall back to a generic local repaint path",
             "Load Image -> Load Mask or LLS Simple Mask Draw -> LLS Simple Checkpoint Loader -> LLS Simple Prompt Encode -> LLS Pro Image Edit Prepare -> LLS Pro KSampler Bridge -> VAE Decode -> LLS Pro Image Edit Finish -> Preview Image",
             "Adding new professional edit models",
         ):

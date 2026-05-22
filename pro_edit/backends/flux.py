@@ -1,14 +1,31 @@
 from .registry import register_backend
-from ..pro_edit_utils import build_native_conditioning_payload, set_conditioning_values
+from ..pro_edit_utils import build_fallback_latent_payload, build_native_conditioning_payload, set_conditioning_values
 
 
 class FluxProEditBackend:
     backend_name = "flux"
 
     def supports(self, profile):
-        return str(profile.get("backend_type") or "").strip().lower() == "flux_edit"
+        return str(profile.get("family") or "").strip().upper().startswith("FLUX")
 
     def prepare(self, *, vae, work_image, work_mask, positive, negative, workspace, routing, **_kwargs):
+        if routing.execution_path != "native_edit":
+            latent = build_fallback_latent_payload(
+                vae,
+                work_image,
+                work_mask,
+                latent_source=f"pro_edit_fallback_{workspace['edit_scope']}",
+            )
+            return {
+                "latent": latent,
+                "positive": positive,
+                "negative": negative,
+                "backend_hints": {
+                    "backend_name": self.backend_name,
+                    "routing_reason": routing.routing_reason,
+                },
+            }
+
         latent, concat_latent_image, concat_mask = build_native_conditioning_payload(
             vae,
             work_image,

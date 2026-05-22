@@ -208,9 +208,9 @@ node/
 ### Backend Selection
 
 - `backend_mode = auto | sdxl | flux`
-- `auto` 现在使用 profile-driven routing：先解析模型 profile，再按 `backend_type` 自动路由
-- 找不到专业后端时直接报错，不会静默降级到旧的 Simple repair 逻辑
-- `sdxl` 和 `flux` 会强制指定后端，但仍然会验证当前模型是否兼容
+- `auto` 现在使用 profile-driven routing：先解析模型 profile，再决定是走原生编辑路径还是 fallback 局部重绘路径
+- 原生 edit/inpaint profile 走 native path；base/generation profile 不再直接报错，而是进入 fallback local repaint
+- `sdxl` 和 `flux` 会按家族强制指定后端，但仍然会验证当前模型是否兼容
 
 ### Profile-Driven Routing
 
@@ -218,6 +218,7 @@ LLS Simple Checkpoint Loader writes the resolved model profile into runtime meta
 
 - `LLS Pro Image Edit Prepare` routes by `backend_type`
 - `LLS Pro KSampler Bridge` routes by `sampler_strategy`
+- `execution_path` records whether this run used `native_edit` or `fallback_repair`
 
 重要 profile 字段：
 
@@ -232,8 +233,9 @@ LLS Simple Checkpoint Loader writes the resolved model profile into runtime meta
 
 Base profile 不会再模糊地进入 Pro 链：
 
-- `SDXL` base 仍然保持 base profile，除非显式 override
-- `FLUX base models should remain on the Simple workflow unless they resolve to flux_edit`
+- `SDXL` / `FLUX` / `SD1.5` base profile 仍然保持官方 base profile
+- base profiles automatically fall back to a generic local repaint path
+- 原生 edit/inpaint 模型才会走 native path
 
 ### Compatibility Metadata
 

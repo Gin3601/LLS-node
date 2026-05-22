@@ -15,6 +15,7 @@ def _ensure_builtin_backends():
     global _BUILTINS_LOADED
     if _BUILTINS_LOADED:
         return
+    importlib.import_module(f"{__package__}.generic")
     importlib.import_module(f"{__package__}.sdxl")
     importlib.import_module(f"{__package__}.flux")
     _BUILTINS_LOADED = True
@@ -77,6 +78,15 @@ def _resolve_profile_and_capabilities(model=None, model_info=None, edit_info=Non
     return profile, capabilities
 
 
+def _resolve_fallback_backend_name(family: str) -> str:
+    normalized = str(family or "").strip().upper()
+    if normalized.startswith("SDXL"):
+        return "sdxl"
+    if normalized.startswith("FLUX"):
+        return "flux"
+    return "generic"
+
+
 def resolve_backend(backend_mode: str, *, model=None, model_info=None, edit_info=None):
     _ensure_builtin_backends()
     mode = str(backend_mode or "auto").strip().lower() or "auto"
@@ -86,26 +96,26 @@ def resolve_backend(backend_mode: str, *, model=None, model_info=None, edit_info
         edit_info=edit_info,
     )
     backend_type = str(profile.get("backend_type") or "none").strip().lower()
-
-    if backend_type == "none":
-        raise RuntimeError(
-            f"[LLS] Pro image edit is not available for profile '{profile['profile_id']}' "
-            f"(family '{profile['family']}', role '{profile['role']}'). "
-            "Use a supported native edit/inpaint profile or provide an explicit override."
-        )
-
-    backend_name = {
+    native_backend_name = {
         "sdxl_native": "sdxl",
         "flux_edit": "flux",
     }.get(backend_type)
-    if backend_name is None:
+    if backend_type != "none" and native_backend_name is None:
         raise RuntimeError(f"[LLS] Unsupported pro edit backend_type '{backend_type}'.")
 
     if mode != "auto":
         backend = get_backend(mode)
         validate_manual_backend(mode, backend, profile)
-        return backend, RoutingResult(backend.backend_name, "manual.override", capabilities, profile)
+        routing_reason = "manual.override" if native_backend_name is not None else "manual.family_fallback"
+        execution_path = "native_edit" if native_backend_name is not None else "fallback_repair"
+        return backend, RoutingResult(backend.backend_name, routing_reason, capabilities, profile, execution_path)
 
-    backend = get_backend(backend_name)
-    validate_manual_backend(backend_name, backend, profile)
-    return backend, RoutingResult(backend.backend_name, "profile.backend_type", capabilities, profile)
+    if native_backend_name is not None:
+        backend = get_backend(native_backend_name)
+        validate_manual_backend(native_backend_name, backend, profile)
+        return backend, RoutingResult(backend.backend_name, "profile.backend_type", capabilities, profile, "native_edit")
+
+    fallback_backend_name = _resolve_fallback_backend_name(str(profile.get("family") or ""))
+    backend = get_backend(fallback_backend_name)
+    validate_manual_backend(fallback_backend_name, backend, profile)
+    return backend, RoutingResult(backend.backend_name, "profile.family_fallback", capabilities, profile, "fallback_repair")

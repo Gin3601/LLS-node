@@ -190,6 +190,58 @@ class TestProEditBridge(unittest.TestCase):
                 model_info=None,
             )
 
+    def test_bridge_routes_base_profile_through_fallback_execution_path(self):
+        model = FakeModel(
+            family="SDXL",
+            model_role="base",
+            supports_inpaint_native=False,
+            supports_image_edit_native=False,
+            preferred_edit_backend=None,
+            profile_id="sdxl_base",
+            backend_type="none",
+            sampler_strategy="standard_k",
+            loader_strategy="sdxl_checkpoint",
+        )
+        latent = {
+            "samples": FakeLatentTensor((1, 4, 64, 64)),
+            "noise_mask": FakeLatentTensor((1, 4, 64, 64)),
+            "source": "pro_edit_fallback_region",
+        }
+
+        with mock.patch.object(self.bridge_module, "_common_ksampler", side_effect=lambda **kwargs: kwargs["latent"]):
+            result_latent, sample_info_json = self.node.sample(
+                model=model,
+                positive=make_conditioning("positive"),
+                negative=make_conditioning("negative"),
+                latent_image=latent,
+                backend_mode="auto",
+                quality_preset="Manual",
+                seed=13,
+                steps=20,
+                cfg=7.0,
+                sampler_name="euler",
+                scheduler="normal",
+                denoise=0.4,
+                denoise_mode="manual",
+                flux_guidance=3.5,
+                model_family="Auto",
+                edit_info={
+                    "backend_name": "sdxl",
+                    "profile_id": "sdxl_base",
+                    "backend_type": "none",
+                    "sampler_strategy": "standard_k",
+                    "execution_path": "fallback_repair",
+                    "recommended_denoise": 0.4,
+                },
+                model_info=None,
+            )
+
+        sample_info = json.loads(sample_info_json)
+        self.assertEqual(result_latent["source"], "pro_edit_fallback_region")
+        self.assertEqual(sample_info["backend_name"], "sdxl")
+        self.assertEqual(sample_info["profile_id"], "sdxl_base")
+        self.assertEqual(sample_info["execution_path"], "fallback_repair")
+
 
 if __name__ == "__main__":
     unittest.main()

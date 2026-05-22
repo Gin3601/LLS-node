@@ -148,6 +148,7 @@ class LLSProKSamplerBridge:
             {
                 "backend_name": routing.backend_name,
                 "routing_reason": routing.routing_reason,
+                "execution_path": routing.execution_path,
                 "family": profile["family"],
                 "model_role": profile["role"],
                 "profile_id": profile["profile_id"],

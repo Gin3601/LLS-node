@@ -49,6 +49,7 @@ def normalize_edit_info(edit_info):
     info = parse_jsonish_info(edit_info)
     info.setdefault("backend_name", "")
     info.setdefault("routing_reason", "")
+    info.setdefault("execution_path", "")
     info.setdefault("model_family", "SD1.5")
     info.setdefault("model_role", "base")
     info.setdefault("profile_id", "")
@@ -99,6 +100,15 @@ def build_native_conditioning_payload(vae, work_image, work_mask, *, latent_sour
         "source": latent_source,
     }
     return latent, concat_latent_image, concat_mask
+
+
+def build_fallback_latent_payload(vae, work_image, work_mask, *, latent_source: str):
+    latent_samples = vae.encode(work_image)
+    return {
+        "samples": latent_samples,
+        "noise_mask": make_noise_mask(work_mask, latent_samples),
+        "source": latent_source,
+    }
 
 
 def build_workspace(
@@ -234,6 +244,7 @@ def build_edit_info(workspace: dict[str, Any], routing, *, backend_hints: dict[s
     info = {
         "backend_name": routing.backend_name,
         "routing_reason": routing.routing_reason,
+        "execution_path": routing.execution_path,
         "model_family": profile["family"],
         "model_role": profile["role"],
         "profile_id": profile["profile_id"],
