@@ -81,11 +81,11 @@ def set_conditioning_values(conditioning, values: dict[str, Any]):
 
 
 def build_masked_pixel_image(image, mask, *, fill_value: float):
-    if hasattr(image, "masked_fill"):
-        return image.masked_fill(mask, fill_value)
     if torch is not None and isinstance(image, torch.Tensor):
         mask_4d = mask.unsqueeze(-1).clamp(0.0, 1.0)
         return (image * (1.0 - mask_4d)) + (float(fill_value) * mask_4d)
+    if hasattr(image, "masked_fill"):
+        return image.masked_fill(mask, fill_value)
     raise RuntimeError("[LLS] image object does not support masked pixel preprocessing.")
 
 
