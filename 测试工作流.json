@@ -2,7 +2,7 @@
   "id": "196d3f49-c541-4fcd-b800-ad54aecdf346",
   "revision": 0,
   "last_node_id": 78,
-  "last_link_id": 128,
+  "last_link_id": 129,
   "nodes": [
     {
       "id": 28,
@@ -1040,15 +1040,15 @@
         "Manual",
         452874131519053,
         "randomize",
-        20,
-        3,
+        30,
+        1,
         "euler",
         "simple",
         1,
         "manual",
-        "flux",
+        "auto",
         3.5,
-        "FLUX_SCHNELL",
+        "Auto",
         ""
       ]
     },
@@ -1144,6 +1144,12 @@
           "link": 74
         },
         {
+          "name": "model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": 129
+        },
+        {
           "name": "positive",
           "shape": 7,
           "type": "CONDITIONING",
@@ -1210,9 +1216,9 @@
         "Node name for S&R": "LLSSimpleRepairPrepare"
       },
       "widgets_values": [
-        "crop",
-        "latent_mask",
-        "repair",
+        "auto",
+        "auto",
+        "replace",
         24,
         8,
         0.5,
@@ -1251,7 +1257,8 @@
           "name": "model",
           "type": "MODEL",
           "links": [
-            68
+            68,
+            129
           ]
         },
         {
@@ -1283,7 +1290,7 @@
         "Node name for S&R": "LLSSimpleCheckpointLoader"
       },
       "widgets_values": [
-        "flux1-schnell-fp8.safetensors",
+        "diffusion_models/fluxFillFP8_v10.safetensors",
         "Auto",
         "simple",
         "auto",
@@ -2146,7 +2153,7 @@
       44,
       0,
       52,
-      3,
+      4,
       "CONDITIONING"
     ],
     [
@@ -2154,7 +2161,7 @@
       44,
       1,
       52,
-      4,
+      5,
       "CONDITIONING"
     ],
     [
@@ -2420,6 +2427,14 @@
       69,
       3,
       "MASK"
+    ],
+    [
+      129,
+      45,
+      0,
+      52,
+      3,
+      "MODEL"
     ]
   ],
   "groups": [

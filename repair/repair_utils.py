@@ -59,8 +59,14 @@ def normalize_model_info(model_info: dict[str, Any] | str | None) -> dict[str, A
     raw_family = raw.get("model_family") or raw.get("family")
     return {
         "model_family": _normalize_model_family(raw_family),
-        "model_role": str(raw.get("model_role") or raw.get("role") or "unknown"),
+        "model_role": str(raw.get("model_role") or raw.get("role") or "unknown").strip().lower(),
+        "profile_id": str(raw.get("profile_id") or ""),
+        "backend_type": str(raw.get("backend_type") or "none").strip().lower(),
+        "sampler_strategy": str(raw.get("sampler_strategy") or "").strip().lower(),
+        "loader_strategy": str(raw.get("loader_strategy") or "").strip().lower(),
         "supports_inpaint_native": _coerce_bool(raw.get("supports_inpaint_native"), False),
+        "supports_image_edit_native": _coerce_bool(raw.get("supports_image_edit_native"), False),
+        "preferred_edit_backend": str(raw.get("preferred_edit_backend") or "").strip().lower(),
     }
 
 
@@ -84,11 +90,27 @@ def normalize_repair_info(repair_info: dict[str, Any] | str | None) -> dict[str,
     info["invert_mask"] = _coerce_bool(info.get("invert_mask"), False)
     info["recommended_denoise"] = _coerce_float(info.get("recommended_denoise"), 0.55)
     info["model_family"] = _normalize_model_family(info.get("model_family") or model_info["model_family"])
-    info["model_role"] = str(info.get("model_role") or model_info["model_role"])
+    info["model_role"] = str(info.get("model_role") or model_info["model_role"]).strip().lower()
+    info["profile_id"] = str(info.get("profile_id") or model_info["profile_id"])
+    info["backend_type"] = str(info.get("backend_type") or model_info["backend_type"] or "none").strip().lower()
+    info["sampler_strategy"] = str(info.get("sampler_strategy") or model_info["sampler_strategy"]).strip().lower()
+    info["loader_strategy"] = str(info.get("loader_strategy") or model_info["loader_strategy"]).strip().lower()
     info["supports_inpaint_native"] = _coerce_bool(
         info.get("supports_inpaint_native", model_info["supports_inpaint_native"]),
         model_info["supports_inpaint_native"],
     )
+    info["supports_image_edit_native"] = _coerce_bool(
+        info.get("supports_image_edit_native", model_info["supports_image_edit_native"]),
+        model_info["supports_image_edit_native"],
+    )
+    info["preferred_edit_backend"] = str(
+        info.get("preferred_edit_backend") or model_info["preferred_edit_backend"] or ""
+    ).strip().lower()
+    info["backend_name"] = str(info.get("backend_name") or "")
+    info["routing_reason"] = str(info.get("routing_reason") or "")
+    info["execution_path"] = str(info.get("execution_path") or "")
+    info["model_patch"] = str(info.get("model_patch") or "")
+    info["model_patch_strength"] = _coerce_float(info.get("model_patch_strength"), 1.0)
     info["repair_payload_version"] = str(info.get("repair_payload_version") or "1.0")
     info["warnings"] = _normalize_warning_list(info.get("warnings"))
     return info
@@ -140,21 +162,34 @@ def resolve_repair_kernel(
     if kernel != "auto":
         if kernel not in _REPAIR_KERNEL_VALUES:
             raise RuntimeError(f"[LLS] Unsupported repair_kernel '{requested_kernel}'.")
-        if kernel == "native_fill" and not normalized_model["supports_inpaint_native"]:
+        if kernel == "native_fill" and not _supports_native_repair(normalized_model):
             warnings.append("native_fill requested but unsupported; falling back to vae_inpaint")
             return "vae_inpaint", warnings
         return kernel, warnings
 
-    if (
-        normalized_model["model_role"] in {"inpaint", "fill", "edit"}
-        and normalized_model["supports_inpaint_native"]
-    ):
+    if normalized_model["model_role"] in {"inpaint", "fill", "edit"} and _supports_native_repair(normalized_model):
         return "native_fill", warnings
 
     if scope != "canvas" and mask_area_ratio <= 0.20 and task_hint in _TASK_HINT_LATENT_MASK:
         return "latent_mask", warnings
 
     return "vae_inpaint", warnings
+
+
+def _supports_native_repair(model_info: dict[str, Any]) -> bool:
+    if _coerce_bool(model_info.get("supports_inpaint_native"), False):
+        return True
+
+    family = _normalize_model_family(model_info.get("model_family"))
+    role = str(model_info.get("model_role") or "").strip().lower()
+    backend_type = str(model_info.get("backend_type") or "").strip().lower()
+    preferred_backend = str(model_info.get("preferred_edit_backend") or "").strip().lower()
+    supports_image_edit_native = _coerce_bool(model_info.get("supports_image_edit_native"), False)
+
+    if family.startswith("FLUX") and role in {"inpaint", "edit", "fill"}:
+        return supports_image_edit_native or backend_type == "flux_edit" or preferred_backend == "flux"
+
+    return False
 
 
 def recommend_denoise(task_hint: str, scope: str, kernel: str, auto_recommend: str) -> float:

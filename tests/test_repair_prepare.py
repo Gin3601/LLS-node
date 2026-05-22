@@ -1,9 +1,26 @@
 import unittest
+from unittest import mock
 
 try:
-    from .test_repair_helpers import FakeMask, FakeVAE, FakeTensor, load_plugin_package
+    from .test_repair_helpers import (
+        FakeMask,
+        FakeModel,
+        FakeTensor,
+        FakeVAE,
+        import_plugin_submodule,
+        load_plugin_package,
+        make_conditioning,
+    )
 except ImportError:  # pragma: no cover - discovery mode imports from top level
-    from test_repair_helpers import FakeMask, FakeVAE, FakeTensor, load_plugin_package
+    from test_repair_helpers import (
+        FakeMask,
+        FakeModel,
+        FakeTensor,
+        FakeVAE,
+        import_plugin_submodule,
+        load_plugin_package,
+        make_conditioning,
+    )
 
 
 class TestRepairPrepare(unittest.TestCase):
@@ -233,6 +250,78 @@ class TestRepairPrepare(unittest.TestCase):
 
         self.assertIs(positive_out, positive)
         self.assertIs(negative_out, negative)
+
+    def test_prepare_region_routes_flux_fill_profile_to_native_backend(self):
+        plugin = load_plugin_package()
+        node = plugin.NODE_CLASS_MAPPINGS["LLSSimpleRepairPrepare"]()
+        repair_runtime = import_plugin_submodule(plugin, "repair.runtime")
+
+        image = FakeTensor((1, 1024, 1024, 3), label="flux-region-image")
+        mask = FakeMask((1, 1024, 1024), mask_bbox=(192, 192, 512, 512), mask_area_ratio=0.10)
+        model = FakeModel(
+            family="FLUX_DEV",
+            model_role="fill",
+            supports_inpaint_native=False,
+            supports_image_edit_native=True,
+            preferred_edit_backend="flux",
+            profile_id="flux_edit",
+            backend_type="flux_edit",
+            sampler_strategy="flux_guided",
+            loader_strategy="flux_split_or_bundle",
+        )
+        native_positive = make_conditioning("native-positive")
+        native_negative = make_conditioning("native-negative")
+        native_latent = {"samples": "native-latent", "noise_mask": "native-mask"}
+
+        with mock.patch.object(
+            repair_runtime,
+            "encode_inpaint_conditioning",
+            return_value=(native_positive, native_negative, native_latent),
+        ) as encode_inpaint:
+            latent, work_image, work_mask, repair_info, recommended, positive, negative = node.prepare(
+                image=image,
+                mask=mask,
+                vae=FakeVAE(latent_channels=16, downscale_ratio=16),
+                repair_scope="region",
+                repair_kernel="auto",
+                task_hint="fill",
+                mask_grow=8,
+                mask_blur=4.0,
+                mask_threshold=0.5,
+                invert_mask=False,
+                crop_context=64,
+                crop_context_factor=1.5,
+                min_size=512,
+                max_size=1024,
+                resize_mode="fit",
+                expand_left=0,
+                expand_right=0,
+                expand_top=0,
+                expand_bottom=0,
+                canvas_fill="edge",
+                auto_recommend="enabled",
+                model=model,
+                model_info=None,
+                positive=make_conditioning("positive"),
+                negative=make_conditioning("negative"),
+            )
+
+        encode_inpaint.assert_called_once()
+        self.assertIs(latent, native_latent)
+        self.assertEqual(latent["source"], "repair_prepare_region")
+        self.assertEqual(work_image.shape, (1, 1024, 1024, 3))
+        self.assertEqual(work_mask.shape, (1, 1024, 1024))
+        self.assertEqual(repair_info["repair_kernel"], "native_fill")
+        self.assertEqual(repair_info["backend_name"], "flux")
+        self.assertEqual(repair_info["execution_path"], "native_repair")
+        self.assertEqual(repair_info["model_patch"], "differential_diffusion")
+        self.assertEqual(repair_info["profile_id"], "flux_edit")
+        self.assertEqual(repair_info["backend_type"], "flux_edit")
+        self.assertEqual(repair_info["sampler_strategy"], "flux_guided")
+        self.assertTrue(repair_info["supports_image_edit_native"])
+        self.assertGreater(recommended, 0.0)
+        self.assertIs(positive, native_positive)
+        self.assertIs(negative, native_negative)
 
     def test_prepare_requires_vae(self):
         plugin = load_plugin_package()

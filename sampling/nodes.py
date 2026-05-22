@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import random
 
+from ..repair import runtime as repair_runtime
 from ..repair.repair_utils import normalize_model_info, normalize_repair_info, resolve_adapter_mode
 from ..utils.model_info import (
     FAMILY_DEFAULT_PRESET,
@@ -150,6 +151,18 @@ def _normalize_ksampler_compat_values(
         model_family = "Auto"
 
     return denoise_mode, adapter_mode, flux_guidance, model_family
+
+
+def _apply_repair_model_patch(model, repair_meta):
+    if repair_meta is None:
+        return model
+
+    patch_name = str(repair_meta.get("model_patch") or "").strip().lower()
+    if patch_name == "differential_diffusion":
+        strength = float(repair_meta.get("model_patch_strength", 1.0))
+        return repair_runtime.apply_differential_diffusion(model, strength=strength)
+
+    return model
 
 
 def _common_ksampler(
@@ -404,10 +417,12 @@ class LLSSimpleKSampler:
         if seed == -1:
             actual_seed = random.randint(0, 0xFFFFFFFFFFFFFFFF)
 
+        sample_model = _apply_repair_model_patch(model, repair_meta)
+
         # 复用 ComfyUI 原生 common_ksampler
         try:
             result_latent = _common_ksampler(
-                model=model,
+                model=sample_model,
                 seed=actual_seed,
                 steps=steps,
                 cfg=cfg,
@@ -438,6 +453,9 @@ class LLSSimpleKSampler:
                 "repair_mode": repair_meta is not None,
                 "repair_scope": repair_meta.get("repair_scope") if repair_meta else None,
                 "repair_kernel": repair_meta.get("repair_kernel") if repair_meta else None,
+                "repair_backend": repair_meta.get("backend_name") if repair_meta else None,
+                "repair_execution_path": repair_meta.get("execution_path") if repair_meta else None,
+                "repair_model_patch": repair_meta.get("model_patch") if repair_meta else None,
                 "guidance_used": bool(guidance_stack),
             }
         )

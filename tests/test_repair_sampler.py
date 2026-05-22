@@ -112,6 +112,65 @@ class TestRepairSampler(unittest.TestCase):
         self.assertEqual(payload["repair_scope"], "region")
         self.assertEqual(payload["repair_kernel"], "latent_mask")
 
+    def test_sampler_patches_native_flux_repair_model_before_sampling(self):
+        load_plugin_package()
+        from lls_node_test_repair.sampling import nodes as sampling_nodes
+
+        node = sampling_nodes.LLSSimpleKSampler()
+        latent = {"samples": FakeLatentTensor((1, 16, 64, 64)), "source": "repair_prepare_region"}
+        model = object()
+        patched_model = object()
+        with mock.patch.object(sampling_nodes, "comfy_sample", object()), mock.patch.object(
+            sampling_nodes,
+            "comfy_samplers",
+            types.SimpleNamespace(KSampler=types.SimpleNamespace(SAMPLERS=["euler"], SCHEDULERS=["simple"])),
+        ), mock.patch.object(
+            sampling_nodes,
+            "_apply_repair_model_patch",
+            return_value=patched_model,
+        ) as patch_model, mock.patch.object(
+            sampling_nodes,
+            "_common_ksampler",
+            return_value={"samples": "done"},
+        ) as common:
+            _result_latent, sample_info = node.sample(
+                model=model,
+                positive="positive",
+                negative="negative",
+                latent_image=latent,
+                quality_preset="Manual",
+                seed=7,
+                steps=20,
+                cfg=1.0,
+                sampler_name="euler",
+                scheduler="simple",
+                denoise=0.33,
+                denoise_mode="auto_from_repair",
+                adapter_mode="auto",
+                flux_guidance=3.5,
+                model_family="Auto",
+                repair_info={
+                    "repair_scope": "region",
+                    "repair_kernel": "native_fill",
+                    "recommended_denoise": 0.61,
+                    "model_family": "FLUX_DEV",
+                    "model_role": "fill",
+                    "backend_name": "flux",
+                    "execution_path": "native_repair",
+                    "model_patch": "differential_diffusion",
+                    "model_patch_strength": 1.0,
+                },
+                guidance_stack=None,
+                model_info=None,
+            )
+
+        patch_model.assert_called_once()
+        self.assertIs(common.call_args.kwargs["model"], patched_model)
+        payload = json.loads(sample_info)
+        self.assertEqual(payload["repair_kernel"], "native_fill")
+        self.assertEqual(payload["repair_backend"], "flux")
+        self.assertEqual(payload["repair_execution_path"], "native_repair")
+
     def test_sampler_recovers_shifted_values_from_broken_widget_order(self):
         load_plugin_package()
         from lls_node_test_repair.sampling import nodes as sampling_nodes

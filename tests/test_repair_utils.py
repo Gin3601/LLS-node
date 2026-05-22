@@ -52,6 +52,13 @@ class TestRepairUtils(unittest.TestCase):
         self.assertTrue(
             utils.normalize_model_info({"supports_inpaint_native": 1})["supports_inpaint_native"]
         )
+        self.assertTrue(
+            utils.normalize_model_info({"supports_image_edit_native": "true"})["supports_image_edit_native"]
+        )
+        self.assertEqual(
+            utils.normalize_model_info({"backend_type": "flux_edit"})["backend_type"],
+            "flux_edit",
+        )
 
     def test_canonicalized_family_feeds_sd_classic_adapter_resolution(self):
         utils = load_repair_utils()
@@ -100,9 +107,16 @@ class TestRepairUtils(unittest.TestCase):
             utils.resolve_repair_kernel(
                 "auto",
                 scope="region",
-                task_hint="repair",
+                task_hint="fill",
                 mask_area_ratio=0.05,
-                model_info={"model_role": "fill", "supports_inpaint_native": True},
+                model_info={
+                    "model_family": "FLUX_DEV",
+                    "model_role": "fill",
+                    "backend_type": "flux_edit",
+                    "supports_inpaint_native": False,
+                    "supports_image_edit_native": True,
+                    "preferred_edit_backend": "flux",
+                },
             )[0],
             "native_fill",
         )
@@ -125,6 +139,29 @@ class TestRepairUtils(unittest.TestCase):
                 model_info={"model_role": "normal", "supports_inpaint_native": False},
             )[0],
             "vae_inpaint",
+        )
+
+    def test_resolve_repair_kernel_downgrades_flux_base_profile_from_native_fill(self):
+        utils = load_repair_utils()
+
+        kernel, warnings = utils.resolve_repair_kernel(
+            "native_fill",
+            scope="region",
+            task_hint="repair",
+            mask_area_ratio=0.05,
+            model_info={
+                "model_family": "FLUX_DEV",
+                "model_role": "base",
+                "backend_type": "none",
+                "supports_inpaint_native": False,
+                "supports_image_edit_native": False,
+                "preferred_edit_backend": None,
+            },
+        )
+        self.assertEqual(kernel, "vae_inpaint")
+        self.assertEqual(
+            warnings,
+            ["native_fill requested but unsupported; falling back to vae_inpaint"],
         )
 
     def test_resolve_repair_kernel_downgrades_explicit_native_fill_when_unsupported(self):

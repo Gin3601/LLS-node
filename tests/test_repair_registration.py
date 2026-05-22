@@ -65,8 +65,9 @@ class TestRepairRegistration(unittest.TestCase):
         ):
             self.assertIn(field, required)
 
-        for field in ("model_info", "positive", "negative"):
+        for field in ("model", "model_info", "positive", "negative"):
             self.assertIn(field, optional)
+        self.assertEqual(optional["model"], ("MODEL",))
         self.assertEqual(required["image"], ("IMAGE",))
         self.assertEqual(required["mask"], ("MASK",))
         self.assertEqual(required["vae"], ("VAE",))

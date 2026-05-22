@@ -1,3 +1,4 @@
+import importlib
 import importlib.util
 import pathlib
 import sys
@@ -45,6 +46,16 @@ class FakeTensor:
             crop_box=self.crop_box,
             fill_mode=fill_mode,
             original_box=original_box,
+        )
+
+    def masked_fill(self, mask, fill_value):
+        del mask
+        return FakeTensor(
+            self.shape,
+            label=f"{self.label}:masked[{fill_value}]",
+            crop_box=self.crop_box,
+            fill_mode=self.fill_mode,
+            original_box=self.original_box,
         )
 
 
@@ -262,9 +273,46 @@ class FakeLatentTensor:
 
 
 class FakeVAE:
+    def __init__(self, latent_channels=4, downscale_ratio=8):
+        self.latent_channels = int(latent_channels)
+        self.downscale_ratio = int(downscale_ratio)
+
     def encode(self, image):
         batch, height, width, _ = image.shape
-        return FakeLatentTensor((batch, 4, height // 8, width // 8))
+        latent_height = max(1, height // self.downscale_ratio)
+        latent_width = max(1, width // self.downscale_ratio)
+        return FakeLatentTensor((batch, self.latent_channels, latent_height, latent_width))
+
+
+class FakeModel:
+    def __init__(
+        self,
+        family="SDXL",
+        model_role="base",
+        supports_inpaint_native=False,
+        supports_image_edit_native=False,
+        preferred_edit_backend=None,
+        model_name="demo-model.safetensors",
+        profile_id="",
+        backend_type="",
+        sampler_strategy="",
+        loader_strategy="",
+    ):
+        self._lls_family = family
+        self._lls_model_role = model_role
+        self._lls_supports_inpaint_native = supports_inpaint_native
+        self._lls_supports_image_edit_native = supports_image_edit_native
+        self._lls_preferred_edit_backend = preferred_edit_backend
+        self._lls_model_name = model_name
+        self._lls_checkpoint_name = model_name
+        self._lls_profile_id = profile_id
+        self._lls_backend_type = backend_type
+        self._lls_sampler_strategy = sampler_strategy
+        self._lls_loader_strategy = loader_strategy
+
+
+def make_conditioning(label):
+    return [[label, {"origin": label}]]
 
 
 def load_plugin_package():
@@ -281,3 +329,7 @@ def load_plugin_package():
     sys.modules[MODULE_NAME] = module
     spec.loader.exec_module(module)
     return module
+
+
+def import_plugin_submodule(plugin, dotted_name: str):
+    return importlib.import_module(f"{plugin.__name__}.{dotted_name}")
