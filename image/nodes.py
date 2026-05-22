@@ -40,6 +40,7 @@ else:
 
 _RESIZE_MODES = ["keep_aspect", "crop_center", "stretch", "none"]
 _SIZE_SOURCES = ["input_image", "custom", "model_recommended"]
+_SAVE_OUTPUT_MODES = ["save", "preview_only"]
 
 
 def _round_to_multiple(value: int, multiple: int) -> int:
@@ -351,6 +352,7 @@ class LLSSaveImage:
             "required": {
                 "image": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "LLS"}),
+                "output_mode": (_SAVE_OUTPUT_MODES, {"default": "save"}),
                 "save_metadata": ("BOOLEAN", {"default": True}),
             },
             "optional": {
@@ -429,6 +431,7 @@ class LLSSaveImage:
         self,
         image,
         filename_prefix: str = "LLS",
+        output_mode: str = "save",
         save_metadata: bool = True,
         model=None,
         clip=None,
@@ -441,6 +444,16 @@ class LLSSaveImage:
         prompt=None,
         extra_pnginfo=None,
     ):
+        if output_mode == "preview_only":
+            if comfy_core_nodes is None or not hasattr(comfy_core_nodes, "PreviewImage"):
+                raise RuntimeError("[LLS] ComfyUI core PreviewImage node is not available.")
+            previewer = comfy_core_nodes.PreviewImage()
+            return previewer.save_images(
+                image,
+                prompt=prompt,
+                extra_pnginfo=None,
+            )
+
         if comfy_core_nodes is None or not hasattr(comfy_core_nodes, "SaveImage"):
             raise RuntimeError("[LLS] ComfyUI core SaveImage node is not available.")
 

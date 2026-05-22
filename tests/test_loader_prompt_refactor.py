@@ -90,6 +90,9 @@ class ComfySDStub:
 
 
 class CoreNodesStub:
+    save_calls = []
+    preview_calls = []
+
     class VAELoader:
         @staticmethod
         def vae_list(_self):
@@ -108,6 +111,14 @@ class CoreNodesStub:
 
     class SaveImage:
         def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
+            CoreNodesStub.save_calls.append(
+                {
+                    "images": images,
+                    "filename_prefix": filename_prefix,
+                    "prompt": prompt,
+                    "extra_pnginfo": extra_pnginfo,
+                }
+            )
             return {
                 "ui": {
                     "images": [
@@ -115,6 +126,29 @@ class CoreNodesStub:
                             "filename": f"{filename_prefix}.png",
                             "subfolder": "",
                             "type": "output",
+                            "extra_pnginfo": extra_pnginfo,
+                            "prompt": prompt,
+                        }
+                    ]
+                }
+            }
+
+    class PreviewImage:
+        def save_images(self, images, prompt=None, extra_pnginfo=None):
+            CoreNodesStub.preview_calls.append(
+                {
+                    "images": images,
+                    "prompt": prompt,
+                    "extra_pnginfo": extra_pnginfo,
+                }
+            )
+            return {
+                "ui": {
+                    "images": [
+                        {
+                            "filename": "preview.png",
+                            "subfolder": "",
+                            "type": "temp",
                             "extra_pnginfo": extra_pnginfo,
                             "prompt": prompt,
                         }
@@ -828,6 +862,27 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(metadata["checkpoint_name"], "sd15.safetensors")
         self.assertEqual(metadata["steps"], 20)
         self.assertEqual(metadata["upscale_mode"], "none")
+
+    def test_save_image_preview_only_uses_native_preview_node_without_saving(self):
+        load_plugin_package()
+        from lls_node_test_refactor.image import nodes as image_nodes
+
+        CoreNodesStub.save_calls = []
+        CoreNodesStub.preview_calls = []
+
+        with mock.patch.object(image_nodes, "comfy_core_nodes", CoreNodesStub()):
+            node = image_nodes.LLSSaveImage()
+            result = node.save(
+                image=FakeTensor((1, 512, 512, 3)),
+                filename_prefix="LLS",
+                save_metadata=True,
+                output_mode="preview_only",
+            )
+
+        self.assertEqual(CoreNodesStub.save_calls, [])
+        self.assertEqual(len(CoreNodesStub.preview_calls), 1)
+        self.assertEqual(result["ui"]["images"][0]["type"], "temp")
+        self.assertIsNone(result["ui"]["images"][0]["extra_pnginfo"])
 
     def test_generation_config_uses_model_inference_without_context(self):
         plugin = load_plugin_package()
