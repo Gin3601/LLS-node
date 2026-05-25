@@ -81,8 +81,8 @@ node/
 `LLS-node` 现在提供一套面向本地工作流的修复链路，由以下节点组成：
 
 - `LLS Simple Mask Create`
-- `LLS Simple Mask Preview`
 - `LLS Simple Mask Draw`
+- `LLS Save Image`
 - `LLS Simple Repair Prepare`
 - `LLS Simple KSampler`
 - `LLS Simple Repair Finish`
@@ -96,14 +96,15 @@ node/
 它适合放在修复准备前或手工绘制前：
 
 - `LLS Simple Mask Create.mask_image -> Preview Image`
-- `Load Image.image + LLS Simple Mask Create.mask -> LLS Simple Mask Preview -> Preview Image`
+- `LLS Simple Mask Create.mask -> LLS Save Image.mask`
 - `Load Image.image + LLS Simple Mask Create.mask -> LLS Simple Repair Prepare`
 - `LLS Simple Mask Create.mask -> LLS Simple Mask Draw.input_mask`
 
 **推荐连接方式：**
 
 - `LLS Simple Mask Create.mask_image -> Preview Image`
-- `Load Image.image + LLS Simple Mask Create.mask -> LLS Simple Mask Preview`
+- `Load Image.image -> LLS Save Image.image`
+- `LLS Simple Mask Create.mask -> LLS Save Image.mask`
 - `Load Image.image -> LLS Simple Repair Prepare.image`
 - `LLS Simple Mask Create.mask -> LLS Simple Repair Prepare.mask`
 - `LLS Simple Mask Create.mask -> LLS Simple Mask Draw.input_mask`
@@ -188,29 +189,22 @@ node/
 - 先创建基础几何区域，再交给 `LLS Simple Mask Draw` 手动修边
 - 为 `LLS Simple Repair Prepare` 提供稳定的初始局部重绘 mask
 
-### `LLS Simple Mask Preview`
+### `LLS Save Image`
 
-`LLS Simple Mask Preview` 只负责把 `image + mask` 做半透明叠加预览，不参与采样，也不修改原图。
+`LLS Save Image` 现在除了保存或预览 `image`，也支持接收一个可选的 `mask` 输入。连上 `mask` 之后，节点会额外输出一份独立的黑白遮罩图，不会覆盖原图结果，也不会做彩色叠加。
 
 **推荐工作流：**
 
-- `Load Image.image + LLS Simple Mask Create.mask -> LLS Simple Mask Preview -> Preview Image`
-- `Load Image.image + LLS Simple Mask Draw.mask -> LLS Simple Mask Preview -> Preview Image`
+- `Load Image.image -> LLS Save Image.image`
+- `LLS Simple Mask Create.mask -> LLS Save Image.mask`
+- `LLS Simple Mask Draw.mask -> LLS Save Image.mask`
+- `LLS Simple Mask Create.mask_image -> Preview Image`
 
-**输入：**
+**行为说明：**
 
-| 名称 | 类型 | 说明 |
-|------|------|------|
-| `image` | `IMAGE` | 必填，原图输入 |
-| `mask` | `MASK` | 必填，待预览的遮罩 |
-| `overlay_alpha` | `FLOAT` | 叠加透明度 |
-| `overlay_color` | `red / green / blue` | 叠加颜色 |
-
-**输出：**
-
-| 名称 | 类型 | 说明 |
-|------|------|------|
-| `preview_image` | `IMAGE` | 原图与半透明彩色 mask 叠加后的预览图 |
+- `output_mode = save` 时：保存原图，同时额外保存一份 `<filename_prefix>_mask`
+- `output_mode = preview_only` 时：预览原图，同时额外预览一份黑白 mask
+- `image` 与 `mask` 各自独立输出，互不影响
 
 ### `LLS Simple Mask Draw`
 
@@ -228,6 +222,7 @@ node/
 - `Load Image.image -> LLS Simple Mask Draw.image`
 - `LLS Simple Mask Draw.image -> LLS Simple Repair Prepare.image`
 - `LLS Simple Mask Draw.mask -> LLS Simple Repair Prepare.mask`
+- `LLS Simple Mask Draw.mask -> LLS Save Image.mask`
 
 **输入：**
 

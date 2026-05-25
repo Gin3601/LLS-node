@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 import importlib
 
+from ..mask.mask_utils import mask_to_image
 from ..utils.model_info import (
     MODEL_FAMILY_CHOICES,
     canonicalize_family,
@@ -361,6 +362,7 @@ class LLSSaveImage:
                 "save_metadata": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "mask": ("MASK",),
                 "prompt_info": ("STRING", {"forceInput": True}),
                 "latent_info": ("STRING", {"forceInput": True}),
                 "sample_info": ("STRING", {"forceInput": True}),
@@ -372,6 +374,18 @@ class LLSSaveImage:
                 "extra_pnginfo": "EXTRA_PNGINFO",
             },
         }
+
+    def _merge_ui_results(self, primary: dict, secondary: dict | None = None) -> dict:
+        if not secondary:
+            return primary
+
+        merged = dict(primary or {})
+        merged_ui = dict(merged.get("ui", {}))
+        merged_images = list(merged_ui.get("images", []))
+        merged_images.extend(list((secondary.get("ui", {}) or {}).get("images", [])))
+        merged_ui["images"] = merged_images
+        merged["ui"] = merged_ui
+        return merged
 
     def _build_metadata(
         self,
@@ -444,6 +458,7 @@ class LLSSaveImage:
         filename_prefix: str = "LLS",
         output_mode: str = "save",
         save_metadata: bool = True,
+        mask=None,
         prompt_info: str | None = None,
         latent_info: str | None = None,
         sample_info: str | None = None,
@@ -456,11 +471,19 @@ class LLSSaveImage:
             if comfy_core_nodes is None or not hasattr(comfy_core_nodes, "PreviewImage"):
                 raise RuntimeError("[LLS] ComfyUI core PreviewImage node is not available.")
             previewer = comfy_core_nodes.PreviewImage()
-            return previewer.save_images(
+            image_result = previewer.save_images(
                 image,
                 prompt=prompt,
                 extra_pnginfo=None,
             )
+            if mask is None:
+                return image_result
+            mask_result = previewer.save_images(
+                mask_to_image(mask),
+                prompt=prompt,
+                extra_pnginfo=None,
+            )
+            return self._merge_ui_results(image_result, mask_result)
 
         if comfy_core_nodes is None or not hasattr(comfy_core_nodes, "SaveImage"):
             raise RuntimeError("[LLS] ComfyUI core SaveImage node is not available.")
@@ -476,12 +499,22 @@ class LLSSaveImage:
                 decode_info=decode_info,
                 upscale_info=upscale_info,
             )
-        return saver.save_images(
+        image_result = saver.save_images(
             image,
             filename_prefix=filename_prefix,
             prompt=prompt,
             extra_pnginfo=merged_extra_pnginfo,
         )
+        if mask is None:
+            return image_result
+
+        mask_result = saver.save_images(
+            mask_to_image(mask),
+            filename_prefix=f"{filename_prefix}_mask",
+            prompt=prompt,
+            extra_pnginfo={},
+        )
+        return self._merge_ui_results(image_result, mask_result)
 
 
 NODE_CLASS_MAPPINGS: dict[str, type] = {

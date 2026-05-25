@@ -51,33 +51,11 @@ class TestMaskCreateRegistration(unittest.TestCase):
         self.assertEqual(required["combine_mode"][1]["default"], "replace")
         self.assertTrue(callable(getattr(node_cls, "create_mask", None)))
 
-    def test_plugin_registers_mask_preview_node(self):
+    def test_plugin_does_not_register_mask_preview_node(self):
         plugin = load_plugin_package()
 
-        self.assertIn("LLSSimpleMaskPreview", plugin.NODE_CLASS_MAPPINGS)
-        self.assertEqual(
-            plugin.NODE_DISPLAY_NAME_MAPPINGS["LLSSimpleMaskPreview"],
-            "LLS Simple Mask Preview",
-        )
-
-    def test_mask_preview_schema_matches_contract(self):
-        plugin = load_plugin_package()
-        node_cls = plugin.NODE_CLASS_MAPPINGS["LLSSimpleMaskPreview"]
-        schema = node_cls.INPUT_TYPES()
-
-        self.assertEqual(node_cls.CATEGORY, "LLS/Mask")
-        self.assertEqual(node_cls.FUNCTION, "preview_mask")
-        self.assertEqual(node_cls.RETURN_TYPES, ("IMAGE",))
-        self.assertEqual(node_cls.RETURN_NAMES, ("preview_image",))
-
-        required = schema["required"]
-
-        self.assertEqual(required["image"], ("IMAGE",))
-        self.assertEqual(required["mask"], ("MASK",))
-        self.assertEqual(required["overlay_alpha"][0], "FLOAT")
-        self.assertEqual(required["overlay_alpha"][1]["default"], 0.4)
-        self.assertEqual(required["overlay_color"][0], ["red", "green", "blue"])
-        self.assertTrue(callable(getattr(node_cls, "preview_mask", None)))
+        self.assertNotIn("LLSSimpleMaskPreview", plugin.NODE_CLASS_MAPPINGS)
+        self.assertNotIn("LLSSimpleMaskPreview", plugin.NODE_DISPLAY_NAME_MAPPINGS)
 
 
 if __name__ == "__main__":
