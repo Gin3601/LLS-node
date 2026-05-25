@@ -356,12 +356,12 @@ class LLSSaveImage:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "image": ("IMAGE",),
                 "filename_prefix": ("STRING", {"default": "LLS"}),
                 "output_mode": (_SAVE_OUTPUT_MODES, {"default": "save"}),
                 "save_metadata": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "image": ("IMAGE",),
                 "mask": ("MASK",),
                 "prompt_info": ("STRING", {"forceInput": True}),
                 "latent_info": ("STRING", {"forceInput": True}),
@@ -376,6 +376,8 @@ class LLSSaveImage:
         }
 
     def _merge_ui_results(self, primary: dict, secondary: dict | None = None) -> dict:
+        if not primary:
+            return secondary or {}
         if not secondary:
             return primary
 
@@ -454,7 +456,7 @@ class LLSSaveImage:
 
     def save(
         self,
-        image,
+        image=None,
         filename_prefix: str = "LLS",
         output_mode: str = "save",
         save_metadata: bool = True,
@@ -467,53 +469,62 @@ class LLSSaveImage:
         prompt=None,
         extra_pnginfo=None,
     ):
+        if image is None and mask is None:
+            raise RuntimeError("[LLS] At least one of IMAGE or MASK must be connected for LLS Save Image.")
+
         if output_mode == "preview_only":
             if comfy_core_nodes is None or not hasattr(comfy_core_nodes, "PreviewImage"):
                 raise RuntimeError("[LLS] ComfyUI core PreviewImage node is not available.")
             previewer = comfy_core_nodes.PreviewImage()
-            image_result = previewer.save_images(
-                image,
-                prompt=prompt,
-                extra_pnginfo=None,
-            )
-            if mask is None:
-                return image_result
-            mask_result = previewer.save_images(
-                mask_to_image(mask),
-                prompt=prompt,
-                extra_pnginfo=None,
-            )
+            image_result = None
+            if image is not None:
+                image_result = previewer.save_images(
+                    image,
+                    prompt=prompt,
+                    extra_pnginfo=None,
+                )
+
+            mask_result = None
+            if mask is not None:
+                mask_result = previewer.save_images(
+                    mask_to_image(mask),
+                    prompt=prompt,
+                    extra_pnginfo=None,
+                )
             return self._merge_ui_results(image_result, mask_result)
 
         if comfy_core_nodes is None or not hasattr(comfy_core_nodes, "SaveImage"):
             raise RuntimeError("[LLS] ComfyUI core SaveImage node is not available.")
 
         saver = comfy_core_nodes.SaveImage()
-        merged_extra_pnginfo = dict(extra_pnginfo or {})
-        if save_metadata:
-            merged_extra_pnginfo["lls_metadata"] = self._build_metadata(
-                image=image,
-                prompt_info=prompt_info,
-                latent_info=latent_info,
-                sample_info=sample_info,
-                decode_info=decode_info,
-                upscale_info=upscale_info,
+        image_result = None
+        if image is not None:
+            merged_extra_pnginfo = dict(extra_pnginfo or {})
+            if save_metadata:
+                merged_extra_pnginfo["lls_metadata"] = self._build_metadata(
+                    image=image,
+                    prompt_info=prompt_info,
+                    latent_info=latent_info,
+                    sample_info=sample_info,
+                    decode_info=decode_info,
+                    upscale_info=upscale_info,
+                )
+            image_result = saver.save_images(
+                image,
+                filename_prefix=filename_prefix,
+                prompt=prompt,
+                extra_pnginfo=merged_extra_pnginfo,
             )
-        image_result = saver.save_images(
-            image,
-            filename_prefix=filename_prefix,
-            prompt=prompt,
-            extra_pnginfo=merged_extra_pnginfo,
-        )
-        if mask is None:
-            return image_result
 
-        mask_result = saver.save_images(
-            mask_to_image(mask),
-            filename_prefix=f"{filename_prefix}_mask",
-            prompt=prompt,
-            extra_pnginfo={},
-        )
+        mask_result = None
+        if mask is not None:
+            mask_filename_prefix = filename_prefix if image is None else f"{filename_prefix}_mask"
+            mask_result = saver.save_images(
+                mask_to_image(mask),
+                filename_prefix=mask_filename_prefix,
+                prompt=prompt,
+                extra_pnginfo={},
+            )
         return self._merge_ui_results(image_result, mask_result)
 
 

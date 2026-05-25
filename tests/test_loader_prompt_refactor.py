@@ -977,13 +977,14 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         required = node_cls.INPUT_TYPES()["required"]
         optional = node_cls.INPUT_TYPES()["optional"]
 
-        self.assertEqual(required["image"][0], "IMAGE")
         self.assertEqual(required["filename_prefix"][0], "STRING")
         self.assertEqual(required["output_mode"][0], ["save", "preview_only"])
         self.assertEqual(required["save_metadata"][0], "BOOLEAN")
+        self.assertNotIn("image", required)
         self.assertNotIn("model", optional)
         self.assertNotIn("clip", optional)
         self.assertNotIn("vae", optional)
+        self.assertEqual(optional["image"], ("IMAGE",))
         self.assertEqual(optional["mask"], ("MASK",))
         self.assertEqual(optional["prompt_info"], ("STRING", {"forceInput": True}))
         self.assertEqual(optional["latent_info"], ("STRING", {"forceInput": True}))
@@ -1092,6 +1093,35 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(len(result["ui"]["images"]), 2)
         self.assertIsNone(result["ui"]["images"][1]["extra_pnginfo"])
 
+    def test_save_image_preview_only_supports_mask_without_image(self):
+        load_plugin_package()
+        from lls_node_test_refactor.image import nodes as image_nodes
+
+        CoreNodesStub.save_calls = []
+        CoreNodesStub.preview_calls = []
+
+        with mock.patch.object(image_nodes, "comfy_core_nodes", CoreNodesStub()):
+            with mock.patch.object(
+                image_nodes,
+                "mask_to_image",
+                side_effect=lambda mask: FakeTensor((mask.shape[0], mask.shape[1], mask.shape[2], 3)),
+                create=True,
+            ):
+                node = image_nodes.LLSSaveImage()
+                result = node.save(
+                    image=None,
+                    mask=FakeTensor((1, 4, 4)),
+                    filename_prefix="LLS",
+                    save_metadata=True,
+                    output_mode="preview_only",
+                )
+
+        self.assertEqual(CoreNodesStub.save_calls, [])
+        self.assertEqual(len(CoreNodesStub.preview_calls), 1)
+        self.assertEqual(tuple(CoreNodesStub.preview_calls[0]["images"].shape), (1, 4, 4, 3))
+        self.assertEqual(len(result["ui"]["images"]), 1)
+        self.assertEqual(result["ui"]["images"][0]["type"], "temp")
+
     def test_save_image_save_mode_emits_separate_mask_file_without_lls_metadata(self):
         load_plugin_package()
         from lls_node_test_refactor.image import nodes as image_nodes
@@ -1123,6 +1153,51 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(CoreNodesStub.save_calls[1]["extra_pnginfo"], {})
         self.assertEqual(tuple(CoreNodesStub.save_calls[1]["images"].shape), (1, 4, 4, 3))
         self.assertEqual(len(result["ui"]["images"]), 2)
+
+    def test_save_image_save_mode_supports_mask_without_image(self):
+        load_plugin_package()
+        from lls_node_test_refactor.image import nodes as image_nodes
+
+        CoreNodesStub.save_calls = []
+        CoreNodesStub.preview_calls = []
+
+        with mock.patch.object(image_nodes, "comfy_core_nodes", CoreNodesStub()):
+            with mock.patch.object(
+                image_nodes,
+                "mask_to_image",
+                side_effect=lambda mask: FakeTensor((mask.shape[0], mask.shape[1], mask.shape[2], 3)),
+                create=True,
+            ):
+                node = image_nodes.LLSSaveImage()
+                result = node.save(
+                    image=None,
+                    mask=FakeTensor((1, 4, 4)),
+                    filename_prefix="LLS",
+                    save_metadata=True,
+                )
+
+        self.assertEqual(len(CoreNodesStub.preview_calls), 0)
+        self.assertEqual(len(CoreNodesStub.save_calls), 1)
+        self.assertEqual(CoreNodesStub.save_calls[0]["filename_prefix"], "LLS")
+        self.assertEqual(CoreNodesStub.save_calls[0]["extra_pnginfo"], {})
+        self.assertEqual(tuple(CoreNodesStub.save_calls[0]["images"].shape), (1, 4, 4, 3))
+        self.assertEqual(len(result["ui"]["images"]), 1)
+
+    def test_save_image_rejects_missing_image_and_mask(self):
+        load_plugin_package()
+        from lls_node_test_refactor.image import nodes as image_nodes
+
+        with mock.patch.object(image_nodes, "comfy_core_nodes", CoreNodesStub()):
+            node = image_nodes.LLSSaveImage()
+
+            with self.assertRaisesRegex(RuntimeError, "At least one of IMAGE or MASK"):
+                node.save(
+                    image=None,
+                    mask=None,
+                    filename_prefix="LLS",
+                    save_metadata=True,
+                    output_mode="preview_only",
+                )
 
     def test_generation_config_uses_model_inference_without_context(self):
         plugin = load_plugin_package()

@@ -191,7 +191,7 @@ node/
 
 ### `LLS Save Image`
 
-`LLS Save Image` 现在除了保存或预览 `image`，也支持接收一个可选的 `mask` 输入。连上 `mask` 之后，节点会额外输出一份独立的黑白遮罩图，不会覆盖原图结果，也不会做彩色叠加。
+`LLS Save Image` 现在支持独立保存或预览 `image` 和 `mask`。`image`、`mask` 两个端口都不是必填，但至少要连接其中一个。连上哪个端口，就输出哪个结果；两个都连时，就同时输出两份结果。
 
 **推荐工作流：**
 
@@ -202,8 +202,9 @@ node/
 
 **行为说明：**
 
-- `output_mode = save` 时：保存原图，同时额外保存一份 `<filename_prefix>_mask`
-- `output_mode = preview_only` 时：预览原图，同时额外预览一份黑白 mask
+- 只连接 `image`：只保存或预览原图
+- 只连接 `mask`：只保存或预览黑白 mask
+- 同时连接 `image + mask`：两者都输出，mask 在保存模式下使用 `<filename_prefix>_mask`
 - `image` 与 `mask` 各自独立输出，互不影响
 
 ### `LLS Simple Mask Draw`
