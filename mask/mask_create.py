@@ -27,7 +27,7 @@ def _resolve_batch_for_mask_creation(input_mask) -> int:
 class LLSSimpleMaskCreate:
     CATEGORY = "LLS/Mask"
     FUNCTION = "create_mask"
-    RETURN_TYPES = ("MASK", "IMAGE", MASK_INFO_TYPE)
+    RETURN_TYPES = ("IMAGE", "MASK", MASK_INFO_TYPE)
     RETURN_NAMES = ("mask_image", "mask", "area_info")
     DESCRIPTION = "Create a geometric mask image from width, height, and shape parameters."
 
