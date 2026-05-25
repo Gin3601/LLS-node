@@ -17,6 +17,8 @@ POSITION_CHOICES = ["top", "bottom", "left", "right"]
 RESIZE_MODE_CHOICES = ["keep_proportion", "stretch", "none"]
 ALIGN_CHOICES = ["start", "center", "end"]
 INPUT_DATA_CHOICES = "IMAGE,MASK"
+PORT_A_NAME = "image/mask_A"
+PORT_B_NAME = "image/mask_B"
 
 
 def _require_torch():
@@ -57,8 +59,8 @@ def resolve_concat_data_type(a, b, requested_data_type: str):
 
     if len(inferred) > 1:
         raise RuntimeError(
-            f"[LLS] Inputs a and b must both resolve to IMAGE or both resolve to MASK. "
-            f"Detected a={inferred_a or 'unknown'}, b={inferred_b or 'unknown'}."
+            f"[LLS] Inputs {PORT_A_NAME} and {PORT_B_NAME} must both resolve to IMAGE or both resolve to MASK. "
+            f"Detected {PORT_A_NAME}={inferred_a or 'unknown'}, {PORT_B_NAME}={inferred_b or 'unknown'}."
         )
     if len(inferred) == 1:
         return inferred.pop()
@@ -450,8 +452,8 @@ class LLSConcatByTarget:
                 "allow_batch_broadcast": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "a": (INPUT_DATA_CHOICES,),
-                "b": (INPUT_DATA_CHOICES,),
+                PORT_A_NAME: (INPUT_DATA_CHOICES,),
+                PORT_B_NAME: (INPUT_DATA_CHOICES,),
             },
         }
 
@@ -470,18 +472,23 @@ class LLSConcatByTarget:
         allow_batch_broadcast,
         a=None,
         b=None,
+        **kwargs,
     ):
         _require_torch()
         data_type = str(data_type or "IMAGE")
         background_value = max(0.0, min(1.0, float(background_value)))
-        resolved_data_type = resolve_concat_data_type(a, b, data_type)
+        input_a = kwargs[PORT_A_NAME] if PORT_A_NAME in kwargs else a
+        input_b = kwargs[PORT_B_NAME] if PORT_B_NAME in kwargs else b
+        resolved_data_type = resolve_concat_data_type(input_a, input_b, data_type)
 
         if resolved_data_type == "IMAGE":
-            if a is None or b is None:
-                raise RuntimeError("[LLS] IMAGE mode requires both inputs a and b to be connected.")
+            if input_a is None or input_b is None:
+                raise RuntimeError(
+                    f"[LLS] IMAGE mode requires both inputs {PORT_A_NAME} and {PORT_B_NAME} to be connected."
+                )
             color = parse_hex_color(background_color)
-            tensor_a = ensure_image_tensor(a)
-            tensor_b = ensure_image_tensor(b)
+            tensor_a = ensure_image_tensor(input_a)
+            tensor_b = ensure_image_tensor(input_b)
             output_image, width, height = concat_by_target(
                 data_type="IMAGE",
                 tensor_a=tensor_a,
@@ -506,10 +513,12 @@ class LLSConcatByTarget:
             return output_image, output_mask, int(width), int(height)
 
         if resolved_data_type == "MASK":
-            if a is None or b is None:
-                raise RuntimeError("[LLS] MASK mode requires both inputs a and b to be connected.")
-            tensor_a = ensure_mask_tensor(a)
-            tensor_b = ensure_mask_tensor(b)
+            if input_a is None or input_b is None:
+                raise RuntimeError(
+                    f"[LLS] MASK mode requires both inputs {PORT_A_NAME} and {PORT_B_NAME} to be connected."
+                )
+            tensor_a = ensure_mask_tensor(input_a)
+            tensor_b = ensure_mask_tensor(input_b)
             output_mask, width, height = concat_by_target(
                 data_type="MASK",
                 tensor_a=tensor_a,

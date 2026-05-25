@@ -31,6 +31,29 @@ class TestConcatByTargetNode(unittest.TestCase):
         self.assertLessEqual(float(image.max().item()), 1.0)
         self.assertTrue(torch.allclose(mask, torch.zeros_like(mask)))
 
+    def test_new_port_names_are_accepted(self):
+        image_a = self.make_image(width=2, height=2, value=0.2)
+        image_b = self.make_image(width=1, height=2, value=0.8)
+
+        image, mask, width, height = self.node.concat(
+            data_type="IMAGE",
+            target="A",
+            position="right",
+            match_target_size=True,
+            resize_mode="none",
+            align="center",
+            gap=0,
+            background_color="#000000",
+            background_value=0.0,
+            multiple_of=0,
+            allow_batch_broadcast=True,
+            **{"image/mask_A": image_a, "image/mask_B": image_b},
+        )
+
+        self.assert_image_output(image, mask, width, height, (1, 2, 3, 3))
+        self.assertTrue(torch.allclose(image[:, :, 0:2, :], torch.full((1, 2, 2, 3), 0.2)))
+        self.assertTrue(torch.allclose(image[:, :, 2:3, :], torch.full((1, 2, 1, 3), 0.8)))
+
     def test_image_mode_target_b_right_places_a_to_the_right_of_b(self):
         image_a = self.make_image(width=2, height=2, value=0.2)
         image_b = self.make_image(width=3, height=2, value=0.8)
@@ -229,7 +252,7 @@ class TestConcatByTargetNode(unittest.TestCase):
             )
 
     def test_missing_required_inputs_for_current_mode_raise_clear_errors(self):
-        with self.assertRaisesRegex(RuntimeError, "inputs a and b"):
+        with self.assertRaisesRegex(RuntimeError, "image/mask_A and image/mask_B"):
             self.node.concat(
                 data_type="IMAGE",
                 target="A",
@@ -246,7 +269,7 @@ class TestConcatByTargetNode(unittest.TestCase):
                 b=None,
             )
 
-        with self.assertRaisesRegex(RuntimeError, "inputs a and b"):
+        with self.assertRaisesRegex(RuntimeError, "image/mask_A and image/mask_B"):
             self.node.concat(
                 data_type="MASK",
                 target="A",
