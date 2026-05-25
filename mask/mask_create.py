@@ -28,7 +28,7 @@ class LLSSimpleMaskCreate:
     CATEGORY = "LLS/Mask"
     FUNCTION = "create_mask"
     RETURN_TYPES = ("MASK", "IMAGE", MASK_INFO_TYPE)
-    RETURN_NAMES = ("mask", "mask_image", "area_info")
+    RETURN_NAMES = ("mask_image", "mask", "area_info")
     DESCRIPTION = "Create a geometric mask image from width, height, and shape parameters."
 
     @classmethod
