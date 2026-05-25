@@ -160,6 +160,74 @@ class TestConcatByTargetNode(unittest.TestCase):
         self.assertTrue(torch.allclose(image[:, :, 0:2, :], torch.full((1, 2, 2, 3), 0.1)))
         self.assertTrue(torch.allclose(image[:, :, 2:5, :], torch.full((1, 2, 3, 3), 0.9)))
 
+    def test_mask_inputs_are_auto_detected_even_if_data_type_is_image(self):
+        mask_a = self.make_mask(width=2, height=2, value=1.0)
+        mask_b = self.make_mask(width=1, height=2, value=0.5)
+
+        image, mask, width, height = self.node.concat(
+            data_type="IMAGE",
+            target="A",
+            position="right",
+            match_target_size=True,
+            resize_mode="none",
+            align="center",
+            gap=0,
+            background_color="#000000",
+            background_value=0.0,
+            multiple_of=0,
+            allow_batch_broadcast=True,
+            a=mask_a,
+            b=mask_b,
+        )
+
+        self.assertEqual((width, height), (3, 2))
+        self.assertEqual(tuple(mask.shape), (1, 2, 3))
+        self.assertEqual(tuple(image.shape), (1, 2, 3, 3))
+        self.assertTrue(torch.allclose(mask[:, :, 0:2], torch.ones((1, 2, 2))))
+        self.assertTrue(torch.allclose(mask[:, :, 2:3], torch.full((1, 2, 1), 0.5)))
+
+    def test_image_inputs_are_auto_detected_even_if_data_type_is_mask(self):
+        image_a = self.make_image(width=2, height=2, value=0.2)
+        image_b = self.make_image(width=1, height=2, value=0.8)
+
+        image, mask, width, height = self.node.concat(
+            data_type="MASK",
+            target="A",
+            position="right",
+            match_target_size=True,
+            resize_mode="none",
+            align="center",
+            gap=0,
+            background_color="#000000",
+            background_value=0.0,
+            multiple_of=0,
+            allow_batch_broadcast=True,
+            a=image_a,
+            b=image_b,
+        )
+
+        self.assert_image_output(image, mask, width, height, (1, 2, 3, 3))
+        self.assertTrue(torch.allclose(image[:, :, 0:2, :], torch.full((1, 2, 2, 3), 0.2)))
+        self.assertTrue(torch.allclose(image[:, :, 2:3, :], torch.full((1, 2, 1, 3), 0.8)))
+
+    def test_mixed_image_and_mask_inputs_raise_clear_error(self):
+        with self.assertRaisesRegex(RuntimeError, "must both resolve to IMAGE or both resolve to MASK"):
+            self.node.concat(
+                data_type="IMAGE",
+                target="A",
+                position="right",
+                match_target_size=True,
+                resize_mode="none",
+                align="center",
+                gap=0,
+                background_color="#000000",
+                background_value=0.0,
+                multiple_of=0,
+                allow_batch_broadcast=True,
+                a=self.make_image(2, 2, 0.2),
+                b=self.make_mask(2, 2, 1.0),
+            )
+
     def test_missing_required_inputs_for_current_mode_raise_clear_errors(self):
         with self.assertRaisesRegex(RuntimeError, "inputs a and b"):
             self.node.concat(

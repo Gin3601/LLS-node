@@ -16,14 +16,7 @@ TARGET_CHOICES = ["A", "B"]
 POSITION_CHOICES = ["top", "bottom", "left", "right"]
 RESIZE_MODE_CHOICES = ["keep_proportion", "stretch", "none"]
 ALIGN_CHOICES = ["start", "center", "end"]
-
-
-class AnyType(str):
-    def __ne__(self, other):  # pragma: no cover - exercised by ComfyUI type checks
-        return False
-
-
-ANY_TYPE = AnyType("*")
+INPUT_DATA_CHOICES = "IMAGE,MASK"
 
 
 def _require_torch():
@@ -34,6 +27,42 @@ def _require_torch():
 def _validate_choice(name: str, value: str, choices):
     if value not in choices:
         raise RuntimeError(f"[LLS] Invalid {name} '{value}'. Expected one of: {', '.join(choices)}.")
+
+
+def infer_tensor_data_type(value):
+    shape = tuple(getattr(value, "shape", ()))
+    if len(shape) == 2:
+        return "MASK"
+    if len(shape) == 3:
+        last_dim = int(shape[-1])
+        if last_dim in {3, 4}:
+            return "IMAGE"
+        if last_dim == 1 and int(shape[0]) > 1 and int(shape[1]) > 1:
+            return "IMAGE"
+        return "MASK"
+    if len(shape) == 4:
+        if int(shape[1]) == 1:
+            return "MASK"
+        if int(shape[-1]) in {3, 4}:
+            return "IMAGE"
+        if int(shape[-1]) == 1:
+            return "MASK"
+    return None
+
+
+def resolve_concat_data_type(a, b, requested_data_type: str):
+    inferred_a = infer_tensor_data_type(a) if a is not None else None
+    inferred_b = infer_tensor_data_type(b) if b is not None else None
+    inferred = {item for item in (inferred_a, inferred_b) if item is not None}
+
+    if len(inferred) > 1:
+        raise RuntimeError(
+            f"[LLS] Inputs a and b must both resolve to IMAGE or both resolve to MASK. "
+            f"Detected a={inferred_a or 'unknown'}, b={inferred_b or 'unknown'}."
+        )
+    if len(inferred) == 1:
+        return inferred.pop()
+    return str(requested_data_type or "IMAGE")
 
 
 def parse_hex_color(color_str: str):
@@ -421,8 +450,8 @@ class LLSConcatByTarget:
                 "allow_batch_broadcast": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "a": (ANY_TYPE,),
-                "b": (ANY_TYPE,),
+                "a": (INPUT_DATA_CHOICES,),
+                "b": (INPUT_DATA_CHOICES,),
             },
         }
 
@@ -445,8 +474,9 @@ class LLSConcatByTarget:
         _require_torch()
         data_type = str(data_type or "IMAGE")
         background_value = max(0.0, min(1.0, float(background_value)))
+        resolved_data_type = resolve_concat_data_type(a, b, data_type)
 
-        if data_type == "IMAGE":
+        if resolved_data_type == "IMAGE":
             if a is None or b is None:
                 raise RuntimeError("[LLS] IMAGE mode requires both inputs a and b to be connected.")
             color = parse_hex_color(background_color)
@@ -475,7 +505,7 @@ class LLSConcatByTarget:
             )
             return output_image, output_mask, int(width), int(height)
 
-        if data_type == "MASK":
+        if resolved_data_type == "MASK":
             if a is None or b is None:
                 raise RuntimeError("[LLS] MASK mode requires both inputs a and b to be connected.")
             tensor_a = ensure_mask_tensor(a)
@@ -499,7 +529,7 @@ class LLSConcatByTarget:
             output_image = mask_to_preview_image(output_mask)
             return output_image, output_mask, int(width), int(height)
 
-        raise RuntimeError(f"[LLS] Invalid data_type '{data_type}'. Expected IMAGE or MASK.")
+        raise RuntimeError(f"[LLS] Invalid data_type '{resolved_data_type}'. Expected IMAGE or MASK.")
 
 
 NODE_CLASS_MAPPINGS = {"LLSConcatByTarget": LLSConcatByTarget}
