@@ -32,6 +32,10 @@ LLS / Utils
 """
 from __future__ import annotations
 
+from .concat_by_target import (
+    NODE_CLASS_MAPPINGS as CONCAT_NODE_CLASS_MAPPINGS,
+    NODE_DISPLAY_NAME_MAPPINGS as CONCAT_NODE_DISPLAY_NAME_MAPPINGS,
+)
 from .model_info import (
     FAMILY_DEFAULT_PRESET,
     MODEL_FAMILY_CHOICES,
@@ -238,6 +242,7 @@ NODE_CLASS_MAPPINGS: dict[str, type] = {
     "LLSResolutionSelector": LLSResolutionSelector,
     "LLSGenerationConfig": LLSGenerationConfig,
 }
+NODE_CLASS_MAPPINGS.update(CONCAT_NODE_CLASS_MAPPINGS)
 
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
     "LLSStringLiteral": "LLS String Literal",
@@ -246,3 +251,4 @@ NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
     "LLSResolutionSelector": "LLS Resolution Selector",
     "LLSGenerationConfig": "LLS Generation Config",
 }
+NODE_DISPLAY_NAME_MAPPINGS.update(CONCAT_NODE_DISPLAY_NAME_MAPPINGS)
