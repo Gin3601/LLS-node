@@ -144,6 +144,32 @@ class TestConcatByTargetNode(unittest.TestCase):
         self.assertTrue(torch.allclose(image[:, :, 0:2, :], torch.full((2, 2, 2, 3), 0.9)))
         self.assertTrue(torch.allclose(image[:, :, 2:4, :], torch.full((2, 2, 2, 3), 0.1)))
 
+    def test_gapless_concat_keeps_output_compact_when_sizes_differ(self):
+        image_a = self.make_image(width=2, height=2, value=0.1)
+        image_b = self.make_image(width=3, height=4, value=0.9)
+
+        image, mask, width, height = self.node.concat(
+            data_type="IMAGE",
+            target="A",
+            position="right",
+            match_target_size=False,
+            resize_mode="none",
+            align="center",
+            gap=0,
+            background_color="#000000",
+            background_value=0.0,
+            multiple_of=0,
+            allow_batch_broadcast=True,
+            image_a=image_a,
+            image_b=image_b,
+            mask_a=None,
+            mask_b=None,
+        )
+
+        self.assert_image_output(image, mask, width, height, (1, 2, 5, 3))
+        self.assertTrue(torch.allclose(image[:, :, 0:2, :], torch.full((1, 2, 2, 3), 0.1)))
+        self.assertTrue(torch.allclose(image[:, :, 2:5, :], torch.full((1, 2, 3, 3), 0.9)))
+
     def test_missing_required_inputs_for_current_mode_raise_clear_errors(self):
         with self.assertRaisesRegex(RuntimeError, "image_a and image_b"):
             self.node.concat(

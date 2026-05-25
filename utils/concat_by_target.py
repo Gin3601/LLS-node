@@ -291,15 +291,25 @@ def concat_by_target(
         target_tensor = target_tensor.to(dtype=torch.float32)
         other_tensor = other_tensor.to(device=target_tensor.device, dtype=torch.float32)
 
-    if match_target_size:
-        match_axis = "height" if position in {"left", "right"} else "width"
-        target_size = int(target_tensor.shape[1] if match_axis == "height" else target_tensor.shape[2])
+    match_axis = "height" if position in {"left", "right"} else "width"
+    target_size = int(target_tensor.shape[1] if match_axis == "height" else target_tensor.shape[2])
+    other_match_size = int(other_tensor.shape[1] if match_axis == "height" else other_tensor.shape[2])
+    compact_concat = int(gap) == 0 and int(multiple_of) == 0
+    needs_compact_alignment = compact_concat and other_match_size != target_size
+
+    if match_target_size or needs_compact_alignment:
+        effective_resize_mode = str(resize_mode)
+        # Gapless concatenation should not invent background bars just because
+        # the non-concat axis differs. When "none" is selected, fall back to
+        # a direct axis stretch so the result stays tight.
+        if needs_compact_alignment and effective_resize_mode == "none":
+            effective_resize_mode = "stretch"
         other_tensor = resize_tensor_to_match(
             other_tensor,
             data_type=data_type,
             match_axis=match_axis,
             target_size=target_size,
-            resize_mode=resize_mode,
+            resize_mode=effective_resize_mode,
         )
 
     if data_type == "IMAGE":
