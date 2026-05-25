@@ -23,8 +23,8 @@ class TestMaskCreateRegistration(unittest.TestCase):
 
         self.assertEqual(node_cls.CATEGORY, "LLS/Mask")
         self.assertEqual(node_cls.FUNCTION, "create_mask")
-        self.assertEqual(node_cls.RETURN_TYPES, ("MASK", "IMAGE", "LLS_MASK_INFO"))
-        self.assertEqual(node_cls.RETURN_NAMES, ("mask", "mask_image", "area_info"))
+        self.assertEqual(node_cls.RETURN_TYPES, ("IMAGE", "MASK", "LLS_MASK_INFO"))
+        self.assertEqual(node_cls.RETURN_NAMES, ("mask_image", "mask", "area_info"))
 
         required = schema["required"]
         optional = schema["optional"]

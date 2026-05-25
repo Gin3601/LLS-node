@@ -68,7 +68,7 @@ class TestMaskCreateNode(unittest.TestCase):
         return self.node.create_mask(**params)
 
     def test_rectangle_percent_mode_creates_expected_bbox_and_area_info(self):
-        mask, mask_image, area_info = self._create()
+        mask_image, mask, area_info = self._create()
 
         self.assertEqual(tuple(mask.shape), (1, 80, 100))
         self.assertEqual(tuple(mask_image.shape), (1, 80, 100, 3))
@@ -88,7 +88,7 @@ class TestMaskCreateNode(unittest.TestCase):
         self.assertEqual(float(mask_image[0, 5, 5, 0].item()), 0.0)
 
     def test_square_pixel_mode_uses_width_as_side(self):
-        mask, _mask_image, area_info = self.node.create_mask(
+        _mask_image, mask, area_info = self.node.create_mask(
             image_width=64,
             image_height=64,
             shape_type="square",
@@ -112,7 +112,7 @@ class TestMaskCreateNode(unittest.TestCase):
         self.assertEqual(float(mask[0, 5, 5].item()), 0.0)
 
     def test_circle_generates_centered_mask(self):
-        mask, _mask_image, area_info = self.node.create_mask(
+        _mask_image, mask, area_info = self.node.create_mask(
             image_width=101,
             image_height=101,
             shape_type="circle",
@@ -136,7 +136,7 @@ class TestMaskCreateNode(unittest.TestCase):
         self.assertEqual(float(mask[0, 10, 10].item()), 0.0)
 
     def test_ellipse_generates_nonempty_mask(self):
-        mask, _mask_image, area_info = self.node.create_mask(
+        _mask_image, mask, area_info = self.node.create_mask(
             image_width=120,
             image_height=90,
             shape_type="ellipse",
@@ -162,7 +162,7 @@ class TestMaskCreateNode(unittest.TestCase):
     def test_union_subtract_and_intersect_with_input_mask(self):
         input_mask = make_mask(width=32, height=32, value=1.0)
 
-        union_mask, _mask_image, union_info = self.node.create_mask(
+        _mask_image, union_mask, union_info = self.node.create_mask(
             image_width=32,
             image_height=32,
             shape_type="rectangle",
@@ -181,7 +181,7 @@ class TestMaskCreateNode(unittest.TestCase):
         self.assertEqual(union_info["binary_area_px"], 32 * 32)
         self.assertTrue(torch.all(union_mask == 1.0))
 
-        subtract_mask, _mask_image, subtract_info = self.node.create_mask(
+        _mask_image, subtract_mask, subtract_info = self.node.create_mask(
             image_width=32,
             image_height=32,
             shape_type="rectangle",
@@ -200,7 +200,7 @@ class TestMaskCreateNode(unittest.TestCase):
         self.assertLess(subtract_info["binary_area_px"], 32 * 32)
         self.assertEqual(float(subtract_mask[0, 16, 16].item()), 0.0)
 
-        intersect_mask, _mask_image, intersect_info = self.node.create_mask(
+        _mask_image, intersect_mask, intersect_info = self.node.create_mask(
             image_width=32,
             image_height=32,
             shape_type="rectangle",
@@ -221,14 +221,14 @@ class TestMaskCreateNode(unittest.TestCase):
         self.assertEqual(float(intersect_mask[0, 1, 1].item()), 0.0)
 
     def test_invert_mask_flips_final_mask(self):
-        mask, _mask_image, area_info = self._create(invert_mask=True)
+        _mask_image, mask, area_info = self._create(invert_mask=True)
 
         self.assertEqual(area_info["invert_mask"], True)
         self.assertEqual(float(mask[0, 40, 50].item()), 0.0)
         self.assertEqual(float(mask[0, 5, 5].item()), 1.0)
 
     def test_feather_and_blur_create_soft_mask(self):
-        mask, _mask_image, area_info = self._create(
+        _mask_image, mask, area_info = self._create(
             shape_type="rectangle",
             coordinate_mode="pixel",
             center_x=50.0,
@@ -244,7 +244,7 @@ class TestMaskCreateNode(unittest.TestCase):
         self.assertTrue(bool(((mask > 0.0) & (mask < 1.0)).any().item()))
 
     def test_shape_outside_image_returns_black_mask_without_crashing(self):
-        mask, _mask_image, area_info = self._create(
+        _mask_image, mask, area_info = self._create(
             shape_type="circle",
             coordinate_mode="percent",
             center_x=2.0,
@@ -260,7 +260,7 @@ class TestMaskCreateNode(unittest.TestCase):
         image = make_image(width=64, height=64, color=0.25)
         input_mask = make_mask(width=16, height=16, value=1.0)
 
-        mask_out, _mask_image, area_info = self.node.create_mask(
+        _mask_image, mask_out, area_info = self.node.create_mask(
             image_width=64,
             image_height=64,
             shape_type="rectangle",
