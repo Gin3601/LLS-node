@@ -41,10 +41,12 @@ class TestConcatByTargetRegistration(unittest.TestCase):
         self.assertEqual(required["background_value"][1]["default"], 0.0)
         self.assertEqual(required["multiple_of"][0], "INT")
         self.assertEqual(required["allow_batch_broadcast"][0], "BOOLEAN")
-        self.assertEqual(optional["image_a"], ("IMAGE",))
-        self.assertEqual(optional["image_b"], ("IMAGE",))
-        self.assertEqual(optional["mask_a"], ("MASK",))
-        self.assertEqual(optional["mask_b"], ("MASK",))
+        self.assertEqual(str(optional["a"][0]), "*")
+        self.assertEqual(str(optional["b"][0]), "*")
+        self.assertNotIn("image_a", optional)
+        self.assertNotIn("image_b", optional)
+        self.assertNotIn("mask_a", optional)
+        self.assertNotIn("mask_b", optional)
 
 
 if __name__ == "__main__":

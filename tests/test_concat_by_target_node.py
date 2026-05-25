@@ -47,10 +47,8 @@ class TestConcatByTargetNode(unittest.TestCase):
             background_value=0.0,
             multiple_of=0,
             allow_batch_broadcast=True,
-            image_a=image_a,
-            image_b=image_b,
-            mask_a=None,
-            mask_b=None,
+            a=image_a,
+            b=image_b,
         )
 
         self.assert_image_output(image, mask, width, height, (1, 2, 6, 3))
@@ -74,10 +72,8 @@ class TestConcatByTargetNode(unittest.TestCase):
             background_value=0.0,
             multiple_of=4,
             allow_batch_broadcast=True,
-            image_a=image_a,
-            image_b=image_b,
-            mask_a=None,
-            mask_b=None,
+            a=image_a,
+            b=image_b,
         )
 
         self.assert_image_output(image, mask, width, height, (1, 4, 12, 3))
@@ -102,10 +98,8 @@ class TestConcatByTargetNode(unittest.TestCase):
             background_value=0.25,
             multiple_of=0,
             allow_batch_broadcast=True,
-            image_a=None,
-            image_b=None,
-            mask_a=mask_a,
-            mask_b=mask_b,
+            a=mask_a,
+            b=mask_b,
         )
 
         self.assertEqual((width, height), (2, 5))
@@ -134,10 +128,8 @@ class TestConcatByTargetNode(unittest.TestCase):
             background_value=0.0,
             multiple_of=0,
             allow_batch_broadcast=True,
-            image_a=image_a,
-            image_b=image_b,
-            mask_a=None,
-            mask_b=None,
+            a=image_a,
+            b=image_b,
         )
 
         self.assert_image_output(image, mask, width, height, (2, 2, 4, 3))
@@ -160,10 +152,8 @@ class TestConcatByTargetNode(unittest.TestCase):
             background_value=0.0,
             multiple_of=0,
             allow_batch_broadcast=True,
-            image_a=image_a,
-            image_b=image_b,
-            mask_a=None,
-            mask_b=None,
+            a=image_a,
+            b=image_b,
         )
 
         self.assert_image_output(image, mask, width, height, (1, 2, 5, 3))
@@ -171,7 +161,7 @@ class TestConcatByTargetNode(unittest.TestCase):
         self.assertTrue(torch.allclose(image[:, :, 2:5, :], torch.full((1, 2, 3, 3), 0.9)))
 
     def test_missing_required_inputs_for_current_mode_raise_clear_errors(self):
-        with self.assertRaisesRegex(RuntimeError, "image_a and image_b"):
+        with self.assertRaisesRegex(RuntimeError, "inputs a and b"):
             self.node.concat(
                 data_type="IMAGE",
                 target="A",
@@ -184,13 +174,11 @@ class TestConcatByTargetNode(unittest.TestCase):
                 background_value=0.0,
                 multiple_of=0,
                 allow_batch_broadcast=True,
-                image_a=None,
-                image_b=None,
-                mask_a=self.make_mask(1, 1, 0.0),
-                mask_b=self.make_mask(1, 1, 0.0),
+                a=None,
+                b=None,
             )
 
-        with self.assertRaisesRegex(RuntimeError, "mask_a and mask_b"):
+        with self.assertRaisesRegex(RuntimeError, "inputs a and b"):
             self.node.concat(
                 data_type="MASK",
                 target="A",
@@ -203,10 +191,8 @@ class TestConcatByTargetNode(unittest.TestCase):
                 background_value=0.0,
                 multiple_of=0,
                 allow_batch_broadcast=True,
-                image_a=self.make_image(1, 1, 0.0),
-                image_b=self.make_image(1, 1, 0.0),
-                mask_a=None,
-                mask_b=None,
+                a=None,
+                b=None,
             )
 
     def test_invalid_background_color_and_batch_mismatch_raise_clear_errors(self):
@@ -226,10 +212,8 @@ class TestConcatByTargetNode(unittest.TestCase):
                 background_value=0.0,
                 multiple_of=0,
                 allow_batch_broadcast=True,
-                image_a=self.make_image(2, 2, 0.1),
-                image_b=self.make_image(2, 2, 0.9),
-                mask_a=None,
-                mask_b=None,
+                a=self.make_image(2, 2, 0.1),
+                b=self.make_image(2, 2, 0.9),
             )
 
         with self.assertRaisesRegex(RuntimeError, "Batch size mismatch"):
@@ -245,10 +229,8 @@ class TestConcatByTargetNode(unittest.TestCase):
                 background_value=0.0,
                 multiple_of=0,
                 allow_batch_broadcast=False,
-                image_a=image_a,
-                image_b=image_b,
-                mask_a=None,
-                mask_b=None,
+                a=image_a,
+                b=image_b,
             )
 
 

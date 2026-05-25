@@ -18,6 +18,14 @@ RESIZE_MODE_CHOICES = ["keep_proportion", "stretch", "none"]
 ALIGN_CHOICES = ["start", "center", "end"]
 
 
+class AnyType(str):
+    def __ne__(self, other):  # pragma: no cover - exercised by ComfyUI type checks
+        return False
+
+
+ANY_TYPE = AnyType("*")
+
+
 def _require_torch():
     if torch is None or torch_nn_functional is None:
         raise RuntimeError("[LLS] torch is required for LLS Concat By Target.") from _TORCH_ERR
@@ -50,16 +58,20 @@ def parse_hex_color(color_str: str):
 def ensure_image_tensor(x):
     _require_torch()
     if x is None:
-        raise RuntimeError("[LLS] IMAGE mode requires both image_a and image_b inputs.")
+        raise RuntimeError("[LLS] IMAGE mode requires both inputs a and b to be connected.")
     if not isinstance(x, torch.Tensor):
         x = torch.as_tensor(x)
     if x.ndim == 3:
+        if int(x.shape[-1]) not in {1, 3, 4}:
+            raise RuntimeError("[LLS] IMAGE input must have shape [B,H,W,C] or [H,W,C].")
         x = x.unsqueeze(0)
     if x.ndim != 4:
         raise RuntimeError("[LLS] IMAGE input must have shape [B,H,W,C] or [H,W,C].")
     batch, height, width, channels = [int(dim) for dim in x.shape]
     if batch <= 0 or height <= 0 or width <= 0 or channels <= 0:
         raise RuntimeError("[LLS] IMAGE input must have positive batch, height, width, and channels.")
+    if channels not in {1, 3, 4}:
+        raise RuntimeError("[LLS] IMAGE input channel count must be 1, 3, or 4.")
     if not torch.is_floating_point(x):
         x = x.to(dtype=torch.float32)
     return x
@@ -68,7 +80,7 @@ def ensure_image_tensor(x):
 def ensure_mask_tensor(x):
     _require_torch()
     if x is None:
-        raise RuntimeError("[LLS] MASK mode requires both mask_a and mask_b inputs.")
+        raise RuntimeError("[LLS] MASK mode requires both inputs a and b to be connected.")
     if not isinstance(x, torch.Tensor):
         x = torch.as_tensor(x)
     if x.ndim == 2:
@@ -409,10 +421,8 @@ class LLSConcatByTarget:
                 "allow_batch_broadcast": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "image_a": ("IMAGE",),
-                "image_b": ("IMAGE",),
-                "mask_a": ("MASK",),
-                "mask_b": ("MASK",),
+                "a": (ANY_TYPE,),
+                "b": (ANY_TYPE,),
             },
         }
 
@@ -429,21 +439,19 @@ class LLSConcatByTarget:
         background_value,
         multiple_of,
         allow_batch_broadcast,
-        image_a=None,
-        image_b=None,
-        mask_a=None,
-        mask_b=None,
+        a=None,
+        b=None,
     ):
         _require_torch()
         data_type = str(data_type or "IMAGE")
         background_value = max(0.0, min(1.0, float(background_value)))
 
         if data_type == "IMAGE":
-            if image_a is None or image_b is None:
-                raise RuntimeError("[LLS] IMAGE mode requires both image_a and image_b inputs.")
+            if a is None or b is None:
+                raise RuntimeError("[LLS] IMAGE mode requires both inputs a and b to be connected.")
             color = parse_hex_color(background_color)
-            tensor_a = ensure_image_tensor(image_a)
-            tensor_b = ensure_image_tensor(image_b)
+            tensor_a = ensure_image_tensor(a)
+            tensor_b = ensure_image_tensor(b)
             output_image, width, height = concat_by_target(
                 data_type="IMAGE",
                 tensor_a=tensor_a,
@@ -468,10 +476,10 @@ class LLSConcatByTarget:
             return output_image, output_mask, int(width), int(height)
 
         if data_type == "MASK":
-            if mask_a is None or mask_b is None:
-                raise RuntimeError("[LLS] MASK mode requires both mask_a and mask_b inputs.")
-            tensor_a = ensure_mask_tensor(mask_a)
-            tensor_b = ensure_mask_tensor(mask_b)
+            if a is None or b is None:
+                raise RuntimeError("[LLS] MASK mode requires both inputs a and b to be connected.")
+            tensor_a = ensure_mask_tensor(a)
+            tensor_b = ensure_mask_tensor(b)
             output_mask, width, height = concat_by_target(
                 data_type="MASK",
                 tensor_a=tensor_a,
