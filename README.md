@@ -207,6 +207,45 @@ node/
 - 同时连接 `image + mask`：两者都输出，mask 在保存模式下使用 `<filename_prefix>_mask`
 - `image` 与 `mask` 各自独立输出，互不影响
 
+### `LLS Simple Image Composite`
+
+`LLS Simple Image Composite` 用于把一张前景图叠加到背景图上，并输出最终合成图像。背景图尺寸始终作为最终输出尺寸，前景图支持平移、缩放、旋转和透明度控制。
+
+**输入：**
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| `background_image` | `IMAGE` | 背景图 |
+| `overlay_image` | `IMAGE` | 前景图 |
+| `x_offset` | `INT` | 前景图水平偏移 |
+| `y_offset` | `INT` | 前景图垂直偏移 |
+| `anchor_mode` | `top_left / center` | 前景图定位方式 |
+| `rotation_origin_mode` | `top_left / center` | 前景图旋转原点 |
+| `opacity` | `FLOAT` | 前景图透明度 |
+| `scale` | `FLOAT` | 前景图缩放倍率 |
+| `rotation` | `FLOAT` | 前景图旋转角度 |
+| `blend_mode` | `normal` | 当前只支持 normal |
+| `keep_aspect` | `BOOLEAN` | 当前保持等比缩放 |
+
+**输出：**
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| `output_image` | `IMAGE` | 合成后的最终图像 |
+
+**典型用途：**
+
+- `Load Image(background) + Load Image(overlay) -> LLS Simple Image Composite -> Preview Image`
+- 把 logo、贴纸或局部元素叠加到背景图的指定位置
+- 通过 `x_offset`、`y_offset`、`scale`、`rotation` 快速摆位
+
+**说明：**
+
+- 前景图超出背景范围时会自动裁剪
+- 如果前景图带 alpha 通道，会优先按 alpha 合成
+- 节点内实时预览优先支持 `Load Image` / `Load Image Output` 作为上游文件来源
+- `anchor_mode` 与 `rotation_origin_mode` 相互独立，可以分别控制定位参考点和旋转参考点
+
 ### `LLS Simple Mask Draw`
 
 `LLS Simple Mask Draw` 是一个面向局部重绘的交互式遮罩输入节点，用来直接在输入图像上手动画 `mask`，并把结果输出给后续修复链路。
