@@ -32,6 +32,16 @@ except Exception as exc:  # pragma: no cover - optional runtime dependency
 else:  # pragma: no cover - exercised in ComfyUI runtime/tests when comfy exists
     _COMFY_UTILS_ERR = None
 
+try:
+    import comfy_extras.nodes_flux as native_flux_nodes
+except Exception:  # pragma: no cover - optional ComfyUI runtime dependency
+    native_flux_nodes = None
+
+try:
+    import comfy_extras.nodes_edit_model as native_edit_model_nodes
+except Exception:  # pragma: no cover - optional ComfyUI runtime dependency
+    native_edit_model_nodes = None
+
 
 RESIZE_MODE_CHOICES = ["longest_edge", "keep_original"]
 MASK_MODE_CHOICES = ["none", "use_mask", "invert_mask"]
@@ -71,6 +81,13 @@ class _ConstantMask:
         )
 
 
+class _ShapeOnlyLatent:
+    """Fallback latent object for tests when torch tensors are unavailable."""
+
+    def __init__(self, shape):
+        self.shape = tuple(shape)
+
+
 def _extract_latent_samples(latent):
     if isinstance(latent, dict) and "samples" in latent:
         return latent["samples"]
@@ -85,6 +102,17 @@ def _get_image_batch_size(image) -> int:
     if batch <= 0:
         raise RuntimeError("[LLS] image1 batch size must be positive.")
     return batch
+
+
+def _extract_node_output_value(value):
+    if hasattr(value, "result"):
+        value = value.result
+    elif hasattr(value, "args"):
+        value = value.args
+
+    if isinstance(value, tuple) and len(value) == 1:
+        return value[0]
+    return value
 
 
 def _scale_size_by_longest_edge(width: int, height: int, target_longest_edge: int) -> tuple[int, int]:
@@ -305,6 +333,70 @@ def _encode_reference_latent(vae, image, target_width: int, target_height: int, 
     return {"samples": samples}, prepared
 
 
+def _encode_image_latent(vae, image, source_name: str):
+    try:
+        samples = vae.encode(image)
+    except Exception as exc:
+        raise RuntimeError(
+            f"[LLS] VAE encode failed for {source_name} / {source_name} 的 VAE 编码失败: {exc}"
+        ) from exc
+    return {"samples": samples}
+
+
+def _get_latent_channels(latent_samples) -> int:
+    shape = tuple(getattr(latent_samples, "shape", ()))
+    if len(shape) < 2:
+        raise RuntimeError("[LLS] Invalid latent tensor shape. 无法识别 latent 通道数。")
+    return int(shape[1])
+
+
+def _build_empty_like_latent(samples):
+    shape = tuple(getattr(samples, "shape", ()))
+    if len(shape) != 4:
+        raise RuntimeError("[LLS] Invalid latent tensor shape for Empty Flux2 latent fallback.")
+
+    if torch is not None and isinstance(samples, torch.Tensor):
+        return {"samples": torch.zeros(shape, dtype=samples.dtype, device=samples.device)}
+
+    try:
+        return {"samples": samples.__class__(shape)}
+    except Exception:
+        return {"samples": _ShapeOnlyLatent(shape)}
+
+
+def _build_empty_flux2_latent(main_image, main_latent):
+    width, height = get_image_size(main_image)
+    batch_size = _get_image_batch_size(main_image)
+
+    execute = getattr(getattr(native_flux_nodes, "EmptyFlux2LatentImage", None), "execute", None)
+    if callable(execute):
+        try:
+            return _extract_node_output_value(execute(width=width, height=height, batch_size=batch_size))
+        except TypeError:
+            return _extract_node_output_value(execute(width, height, batch_size))
+        except Exception:
+            pass
+
+    return _build_empty_like_latent(_extract_latent_samples(main_latent))
+
+
+def _attach_reference_latents(conditioning, ref_latents):
+    if not ref_latents:
+        return conditioning
+
+    execute = getattr(getattr(native_edit_model_nodes, "ReferenceLatent", None), "execute", None)
+    if callable(execute):
+        updated = conditioning
+        for ref_latent in ref_latents:
+            try:
+                updated = _extract_node_output_value(execute(updated, latent=ref_latent))
+            except TypeError:
+                updated = _extract_node_output_value(execute(updated, ref_latent))
+        return updated
+
+    return _append_reference_latents(conditioning, [_extract_latent_samples(latent) for latent in ref_latents])
+
+
 def _build_noise_mask(mask, latent_samples):
     target_width = int(latent_samples.shape[-1])
     target_height = int(latent_samples.shape[-2])
@@ -386,25 +478,48 @@ class LLSFlux2KleinEditTextEncode:
         conditioning, full_prompt = _encode_multivision_conditioning(clip, str(prompt), vision_images)
 
         target_width, target_height = get_image_size(main_image)
-        ref_latents = []
-        for index, image in enumerate(images_for_edit, start=1):
-            ref_latent, _prepared = _encode_reference_latent(
-                vae,
-                image,
-                target_width,
-                target_height,
-                source_name=f"image{index}",
-            )
-            ref_latents.append(ref_latent)
+        main_latent = _encode_image_latent(vae, main_image, source_name="image1")
+        main_latent_channels = _get_latent_channels(_extract_latent_samples(main_latent))
+        use_official_flux2_latent = main_latent_channels >= 128
 
-        conditioning = _append_reference_latents(
-            conditioning,
-            [_extract_latent_samples(latent) for latent in ref_latents],
-        )
+        ref_latents = [main_latent]
+        if reference_image_2 is not None:
+            if use_official_flux2_latent:
+                ref_latents.append(_encode_image_latent(vae, reference_image_2, source_name="image2"))
+            else:
+                ref_latent, _prepared = _encode_reference_latent(
+                    vae,
+                    reference_image_2,
+                    target_width,
+                    target_height,
+                    source_name="image2",
+                )
+                ref_latents.append(ref_latent)
+        if reference_image_3 is not None:
+            if use_official_flux2_latent:
+                ref_latents.append(_encode_image_latent(vae, reference_image_3, source_name="image3"))
+            else:
+                ref_latent, _prepared = _encode_reference_latent(
+                    vae,
+                    reference_image_3,
+                    target_width,
+                    target_height,
+                    source_name="image3",
+                )
+                ref_latents.append(ref_latent)
 
-        latent = {
-            "samples": _extract_latent_samples(ref_latents[0]),
-        }
+        conditioning = _attach_reference_latents(conditioning, ref_latents)
+
+        if use_official_flux2_latent:
+            latent = _build_empty_flux2_latent(main_image, main_latent)
+            latent_mode = "empty_flux2_latent"
+            conditioning_backend = "flux2klein_multivision_clip+reference_latent"
+        else:
+            latent = {
+                "samples": _extract_latent_samples(main_latent),
+            }
+            latent_mode = "image1_reference_latent"
+            conditioning_backend = "flux2klein_multivision_clip"
 
         if mask is not None and str(mask_mode) != "none":
             latent["noise_mask"] = _build_noise_mask(output_mask, latent["samples"])
@@ -426,13 +541,14 @@ class LLSFlux2KleinEditTextEncode:
             "main_image": "image1",
             "reference_images": reference_names,
             "num_reference_images": len(reference_names),
-            "conditioning_backend": "flux2klein_multivision_clip",
+            "conditioning_backend": conditioning_backend,
             "native_error": None,
-            "native_wrapper": "PainterFluxImageEdit-compatible",
-            "latent_mode": "image1_reference_latent",
+            "native_wrapper": "official Flux2 ReferenceLatent" if use_official_flux2_latent else "PainterFluxImageEdit-compatible",
+            "latent_mode": latent_mode,
             "latent_has_noise_mask": "noise_mask" in latent,
             "vision_image_count": len(vision_images),
             "reference_latent_count": len(ref_latents),
+            "main_latent_channels": main_latent_channels,
             "target_size": {"width": int(target_width), "height": int(target_height)},
             "note": "image1 is main edit image; image2 and image3 are reference images; images are not concatenated",
         }

@@ -19,6 +19,9 @@ LEGACY_FAMILY_ALIASES: dict[str, str] = {
     "FLUX": "FLUX_DEV",
     "FLUX_SCHNELL": "FLUX_SCHNELL",
     "FLUX_DEV": "FLUX_DEV",
+    "FLUX2": "FLUX2_DEV",
+    "FLUX2_DEV": "FLUX2_DEV",
+    "FLUX2_KLEIN": "FLUX2_KLEIN",
 }
 
 MODEL_FAMILY_CHOICES: list[str] = [
@@ -29,6 +32,8 @@ MODEL_FAMILY_CHOICES: list[str] = [
     "SDXL_TURBO",
     "FLUX_SCHNELL",
     "FLUX_DEV",
+    "FLUX2_DEV",
+    "FLUX2_KLEIN",
 ]
 
 FAMILY_DEFAULTS: dict[str, dict[str, Any]] = {
@@ -122,6 +127,42 @@ FAMILY_DEFAULTS: dict[str, dict[str, Any]] = {
         "is_turbo": False,
         "is_flux": True,
     },
+    "FLUX2_DEV": {
+        "text_encoder_type": "flux2_qwen",
+        "required_text_encoders": ["qwen_3_8b"],
+        "required_vae": "required",
+        "latent_channels": 128,
+        "downscale_ratio": 16,
+        "default_width": 1024,
+        "default_height": 1024,
+        "default_steps": 20,
+        "default_cfg": 1.0,
+        "default_guidance": 3.5,
+        "default_sampler": "euler",
+        "default_scheduler": "simple",
+        "default_denoise": 1.0,
+        "guidance_embed": True,
+        "is_turbo": False,
+        "is_flux": True,
+    },
+    "FLUX2_KLEIN": {
+        "text_encoder_type": "flux2_qwen",
+        "required_text_encoders": ["qwen_3_8b"],
+        "required_vae": "required",
+        "latent_channels": 128,
+        "downscale_ratio": 16,
+        "default_width": 1024,
+        "default_height": 1024,
+        "default_steps": 20,
+        "default_cfg": 1.0,
+        "default_guidance": 3.5,
+        "default_sampler": "euler",
+        "default_scheduler": "simple",
+        "default_denoise": 1.0,
+        "guidance_embed": True,
+        "is_turbo": False,
+        "is_flux": True,
+    },
 }
 
 SAMPLING_PRESETS: dict[str, dict[str, dict[str, float | int | None]]] = {
@@ -190,6 +231,32 @@ SAMPLING_PRESETS: dict[str, dict[str, dict[str, float | int | None]]] = {
         "Balanced": {"steps": 20, "cfg": 1.0, "guidance": 3.5, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0},
         "High Quality": {"steps": 28, "cfg": 1.0, "guidance": 3.5, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0},
     },
+    "FLUX2_DEV": {
+        FAMILY_DEFAULT_PRESET: {
+            "steps": 20,
+            "cfg": 1.0,
+            "guidance": 3.5,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "denoise": 1.0,
+        },
+        "Fast": {"steps": 12, "cfg": 1.0, "guidance": 3.5, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0},
+        "Balanced": {"steps": 20, "cfg": 1.0, "guidance": 3.5, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0},
+        "High Quality": {"steps": 28, "cfg": 1.0, "guidance": 3.5, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0},
+    },
+    "FLUX2_KLEIN": {
+        FAMILY_DEFAULT_PRESET: {
+            "steps": 20,
+            "cfg": 1.0,
+            "guidance": 3.5,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "denoise": 1.0,
+        },
+        "Fast": {"steps": 12, "cfg": 1.0, "guidance": 3.5, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0},
+        "Balanced": {"steps": 20, "cfg": 1.0, "guidance": 3.5, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0},
+        "High Quality": {"steps": 28, "cfg": 1.0, "guidance": 3.5, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0},
+    },
 }
 
 _LEGACY_MODEL_INFO_PATTERN = re.compile(r"(\w+)=([^|]+)")
@@ -219,6 +286,10 @@ def infer_family_from_name(model_name: str | None, fallback: str = "SD1.5") -> s
         return canonicalize_family(fallback)
 
     name = str(model_name).lower()
+    if "flux-2" in name or "flux2" in name or "flux.2" in name:
+        if "klein" in name:
+            return "FLUX2_KLEIN"
+        return "FLUX2_DEV"
     if "flux" in name:
         if "schnell" in name:
             return "FLUX_SCHNELL"
@@ -231,7 +302,11 @@ def infer_family_from_name(model_name: str | None, fallback: str = "SD1.5") -> s
 
 
 def is_flux_family(family: str | None) -> bool:
-    return canonicalize_family(family) in {"FLUX_SCHNELL", "FLUX_DEV"}
+    return canonicalize_family(family) in {"FLUX_SCHNELL", "FLUX_DEV", "FLUX2_DEV", "FLUX2_KLEIN"}
+
+
+def is_flux2_family(family: str | None) -> bool:
+    return canonicalize_family(family) in {"FLUX2_DEV", "FLUX2_KLEIN"}
 
 
 def is_sdxl_family(family: str | None) -> bool:
@@ -460,6 +535,8 @@ def infer_family_from_clip(clip) -> str:
         tokens = clip.tokenize("")
     except Exception:
         return "SD1.5"
+    if "qwen" in getattr(clip, "_lls_text_encoder_type", ""):
+        return "FLUX2_KLEIN"
     if "t5xxl" in tokens:
         return "FLUX_DEV"
     if "g" in tokens:

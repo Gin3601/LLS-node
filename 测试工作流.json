@@ -1,8 +1,8 @@
 {
   "id": "196d3f49-c541-4fcd-b800-ad54aecdf346",
   "revision": 0,
-  "last_node_id": 78,
-  "last_link_id": 129,
+  "last_node_id": 187,
+  "last_link_id": 317,
   "nodes": [
     {
       "id": 28,
@@ -16,7 +16,7 @@
         46
       ],
       "flags": {},
-      "order": 24,
+      "order": 61,
       "mode": 4,
       "inputs": [
         {
@@ -58,7 +58,7 @@
         198
       ],
       "flags": {},
-      "order": 27,
+      "order": 69,
       "mode": 4,
       "inputs": [
         {
@@ -107,7 +107,7 @@
         331.33331298828125
       ],
       "flags": {},
-      "order": 30,
+      "order": 74,
       "mode": 4,
       "inputs": [
         {
@@ -199,7 +199,7 @@
         238
       ],
       "flags": {},
-      "order": 9,
+      "order": 24,
       "mode": 4,
       "inputs": [
         {
@@ -310,7 +310,7 @@
         230
       ],
       "flags": {},
-      "order": 8,
+      "order": 23,
       "mode": 4,
       "inputs": [
         {
@@ -371,7 +371,7 @@
         446
       ],
       "flags": {},
-      "order": 17,
+      "order": 42,
       "mode": 4,
       "inputs": [
         {
@@ -428,7 +428,7 @@
       },
       "widgets_values": [
         "Family Default",
-        778491660376767,
+        57146633536829,
         "randomize",
         20,
         7,
@@ -454,7 +454,7 @@
         498
       ],
       "flags": {},
-      "order": 10,
+      "order": 25,
       "mode": 4,
       "inputs": [
         {
@@ -490,7 +490,7 @@
         1024,
         1024,
         20,
-        411574122219210,
+        720687637906196,
         "randomize",
         1,
         "",
@@ -556,7 +556,7 @@
         246
       ],
       "flags": {},
-      "order": 18,
+      "order": 43,
       "mode": 4,
       "inputs": [
         {
@@ -585,7 +585,7 @@
         46
       ],
       "flags": {},
-      "order": 28,
+      "order": 70,
       "mode": 4,
       "inputs": [
         {
@@ -627,7 +627,7 @@
         286
       ],
       "flags": {},
-      "order": 31,
+      "order": 75,
       "mode": 4,
       "inputs": [
         {
@@ -694,7 +694,7 @@
         260
       ],
       "flags": {},
-      "order": 12,
+      "order": 27,
       "mode": 4,
       "inputs": [
         {
@@ -762,7 +762,7 @@
         534
       ],
       "flags": {},
-      "order": 11,
+      "order": 26,
       "mode": 4,
       "inputs": [
         {
@@ -813,7 +813,7 @@
         "qwen_image_edit_2509_fp8_e4m3fn.safetensors",
         "cat",
         20,
-        616252094308538,
+        184924681839159,
         "randomize",
         "",
         4,
@@ -841,7 +841,7 @@
       "flags": {
         "collapsed": false
       },
-      "order": 19,
+      "order": 44,
       "mode": 4,
       "inputs": [
         {
@@ -870,7 +870,7 @@
         26
       ],
       "flags": {},
-      "order": 13,
+      "order": 28,
       "mode": 4,
       "inputs": [
         {
@@ -907,7 +907,7 @@
         246
       ],
       "flags": {},
-      "order": 20,
+      "order": 45,
       "mode": 4,
       "inputs": [
         {
@@ -981,7 +981,7 @@
         446
       ],
       "flags": {},
-      "order": 25,
+      "order": 62,
       "mode": 4,
       "inputs": [
         {
@@ -1038,17 +1038,17 @@
       },
       "widgets_values": [
         "Manual",
-        452874131519053,
+        795589905965275,
         "randomize",
-        30,
-        1,
+        20,
+        3,
         "euler",
         "simple",
         1,
         "manual",
-        "auto",
+        "flux",
         3.5,
-        "Auto",
+        "FLUX_SCHNELL",
         ""
       ]
     },
@@ -1064,7 +1064,7 @@
         230
       ],
       "flags": {},
-      "order": 14,
+      "order": 29,
       "mode": 4,
       "inputs": [
         {
@@ -1125,7 +1125,7 @@
         610
       ],
       "flags": {},
-      "order": 21,
+      "order": 46,
       "mode": 4,
       "inputs": [
         {
@@ -1147,7 +1147,7 @@
           "name": "model",
           "shape": 7,
           "type": "MODEL",
-          "link": 129
+          "link": null
         },
         {
           "name": "positive",
@@ -1216,9 +1216,9 @@
         "Node name for S&R": "LLSSimpleRepairPrepare"
       },
       "widgets_values": [
-        "auto",
-        "auto",
-        "replace",
+        "crop",
+        "latent_mask",
+        "repair",
         24,
         8,
         0.5,
@@ -1257,8 +1257,7 @@
           "name": "model",
           "type": "MODEL",
           "links": [
-            68,
-            129
+            68
           ]
         },
         {
@@ -1290,7 +1289,7 @@
         "Node name for S&R": "LLSSimpleCheckpointLoader"
       },
       "widgets_values": [
-        "diffusion_models/fluxFillFP8_v10.safetensors",
+        "flux1-schnell-fp8.safetensors",
         "Auto",
         "simple",
         "auto",
@@ -1312,7 +1311,7 @@
         266.6666259765625
       ],
       "flags": {},
-      "order": 34,
+      "order": 80,
       "mode": 4,
       "inputs": [
         {
@@ -1330,95 +1329,307 @@
       "widgets_values": []
     },
     {
-      "id": 75,
-      "type": "LLSSimplePromptEncode",
+      "id": 106,
+      "type": "LLSSimpleVAEDecode",
       "pos": [
-        729.0904534452774,
-        2132.2419149554676
+        3396.658294139144,
+        -237.99958291844857
+      ],
+      "size": [
+        270,
+        80
+      ],
+      "flags": {},
+      "order": 71,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "samples",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 188
+        },
+        {
+          "label": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 189
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            177
+          ]
+        },
+        {
+          "name": "decode_info",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": [
+            180
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSimpleVAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 102,
+      "type": "LLSSimpleKSampler",
+      "pos": [
+        3401.5494082311957,
+        -726.0376830521335
+      ],
+      "size": [
+        380,
+        446
+      ],
+      "flags": {},
+      "order": 63,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 172
+        },
+        {
+          "label": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 173
+        },
+        {
+          "label": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 174
+        },
+        {
+          "label": "latent_image",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 175
+        },
+        {
+          "label": "repair_info",
+          "name": "repair_info",
+          "shape": 7,
+          "type": "LLS_REPAIR_INFO",
+          "link": null
+        },
+        {
+          "label": "guidance_stack",
+          "name": "guidance_stack",
+          "shape": 7,
+          "type": "LLS_GUIDANCE_STACK",
+          "link": null
+        },
+        {
+          "label": "model_info",
+          "name": "model_info",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "model_info"
+          },
+          "link": 176
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            188
+          ]
+        },
+        {
+          "name": "sample_info",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": [
+            179
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSimpleKSampler"
+      },
+      "widgets_values": [
+        "Family Default",
+        571958248511790,
+        "randomize",
+        20,
+        7,
+        "euler",
+        "normal",
+        1,
+        "manual",
+        "auto",
+        3.5,
+        "Auto",
+        ""
+      ]
+    },
+    {
+      "id": 105,
+      "type": "LLSNativeInpaintConditioning",
+      "pos": [
+        2968.5116995518965,
+        -719.9131753308342
       ],
       "size": [
         400,
         230
       ],
       "flags": {},
-      "order": 16,
-      "mode": 0,
+      "order": 47,
+      "mode": 4,
       "inputs": [
         {
-          "name": "text_encoder",
-          "shape": 7,
-          "type": "CLIP",
-          "link": 114
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 181
         },
         {
-          "name": "clip",
+          "label": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 182
+        },
+        {
+          "label": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 183
+        },
+        {
+          "label": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 184
+        },
+        {
+          "label": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 185
+        },
+        {
+          "label": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "link": 186
+        },
+        {
+          "label": "model_info",
+          "name": "model_info",
           "shape": 7,
-          "type": "CLIP",
-          "link": 113
+          "type": "STRING",
+          "widget": {
+            "name": "model_info"
+          },
+          "link": 187
         }
       ],
       "outputs": [
         {
+          "name": "model",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            172
+          ]
+        },
+        {
           "name": "positive",
           "type": "CONDITIONING",
+          "slot_index": 1,
           "links": [
-            116
+            173
           ]
         },
         {
           "name": "negative",
           "type": "CONDITIONING",
+          "slot_index": 2,
           "links": [
-            117
+            174
           ]
         },
         {
-          "name": "prompt_info",
+          "name": "latent",
+          "type": "LATENT",
+          "slot_index": 3,
+          "links": [
+            175
+          ]
+        },
+        {
+          "name": "inpaint_info",
           "type": "STRING",
+          "slot_index": 4,
           "links": null
         }
       ],
       "properties": {
         "aux_id": "Gin3601/LLS-node",
-        "ver": "3e97537f543c74db0e91a840d698105c5f269931",
-        "Node name for S&R": "LLSSimplePromptEncode"
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSNativeInpaintConditioning"
       },
       "widgets_values": [
-        "在地毯上面趴着一只棕白色小狗",
-        "",
-        -1,
-        "Auto"
+        "auto",
+        1,
+        true,
+        ""
       ]
     },
     {
-      "id": 72,
+      "id": 100,
       "type": "LoadImage",
       "pos": [
-        436.3254192042775,
-        1795.836696533043
+        2233.2844869832297,
+        -718.2666335104449
       ],
       "size": [
-        270,
-        314.0000000000002
+        340,
+        520
       ],
       "flags": {},
       "order": 6,
-      "mode": 0,
+      "mode": 4,
       "inputs": [],
       "outputs": [
         {
+          "label": "IMAGE",
           "name": "IMAGE",
           "type": "IMAGE",
+          "slot_index": 0,
           "links": [
-            110
+            185
           ]
         },
         {
+          "label": "MASK",
           "name": "MASK",
           "type": "MASK",
+          "slot_index": 1,
           "links": [
-            109,
-            111
+            186
           ]
         }
       ],
@@ -1426,32 +1637,1055 @@
         "cnr_id": "comfy-core",
         "ver": "0.21.0",
         "Node name for S&R": "LoadImage",
-        "image": "clipspace/clipspace-painted-masked-1779412561163.png [input]"
+        "image": "clipspace/clipspace-painted-masked-1779440890663.png [input]"
       },
       "widgets_values": [
-        "clipspace/clipspace-painted-masked-1779412561163.png [input]",
+        "clipspace/clipspace-painted-masked-1779440890663.png [input]",
         "image"
       ]
     },
     {
-      "id": 73,
+      "id": 101,
+      "type": "LLSUniversalPromptEncode",
+      "pos": [
+        2602.047016798851,
+        -392.4342301390179
+      ],
+      "size": [
+        360,
+        230
+      ],
+      "flags": {},
+      "order": 30,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "text_encoder",
+          "name": "text_encoder",
+          "type": "CLIP",
+          "link": 170
+        },
+        {
+          "label": "model_info",
+          "name": "model_info",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "model_info"
+          },
+          "link": 171
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            182
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "slot_index": 1,
+          "links": [
+            183
+          ]
+        },
+        {
+          "name": "prompt_info",
+          "type": "STRING",
+          "slot_index": 2,
+          "links": [
+            178
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSUniversalPromptEncode"
+      },
+      "widgets_values": [
+        "Delete object",
+        "",
+        -1,
+        ""
+      ]
+    },
+    {
+      "id": 104,
+      "type": "LLSUniversalModelLoader",
+      "pos": [
+        2584.540226717693,
+        -728.0477437181929
+      ],
+      "size": [
+        360,
+        286
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            181
+          ]
+        },
+        {
+          "name": "text_encoder",
+          "type": "CLIP",
+          "slot_index": 1,
+          "links": [
+            170
+          ]
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "slot_index": 2,
+          "links": [
+            184,
+            189
+          ]
+        },
+        {
+          "name": "model_info",
+          "type": "STRING",
+          "slot_index": 3,
+          "links": [
+            171,
+            176,
+            187
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSUniversalModelLoader"
+      },
+      "widgets_values": [
+        "diffusion_models/flux1-dev-fp8.safetensors",
+        "Auto",
+        "simple",
+        "auto",
+        "auto",
+        "(auto)",
+        "(auto)",
+        "(auto)"
+      ]
+    },
+    {
+      "id": 119,
+      "type": "LLSSimpleImageComposite",
+      "pos": [
+        2521.558814278452,
+        55.555063701255484
+      ],
+      "size": [
+        293.1587890625,
+        270
+      ],
+      "flags": {},
+      "order": 34,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "background_image",
+          "type": "IMAGE",
+          "link": 202
+        },
+        {
+          "name": "overlay_image",
+          "type": "IMAGE",
+          "link": 203
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output_image",
+          "type": "IMAGE",
+          "links": [
+            204
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "fd5a2b9de2bd67ca913139e16992300b4681acfe",
+        "Node name for S&R": "LLSSimpleImageComposite"
+      },
+      "widgets_values": [
+        0,
+        0,
+        "top_left",
+        "center",
+        1,
+        "normal",
+        2,
+        30,
+        true
+      ]
+    },
+    {
+      "id": 118,
+      "type": "LLSSaveImage",
+      "pos": [
+        2839.4222975619614,
+        51.68227455109402
+      ],
+      "size": [
+        270,
+        438.0000000000001
+      ],
+      "flags": {},
+      "order": 51,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 204
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "name": "prompt_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "latent_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "sample_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "decode_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "upscale_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "23dd271e39c4a99e3e9c01eabfb8ca5f181ca92e",
+        "Node name for S&R": "LLSSaveImage"
+      },
+      "widgets_values": [
+        "LLS",
+        "save",
+        true
+      ]
+    },
+    {
+      "id": 129,
+      "type": "LLSMaskProcess",
+      "pos": [
+        2511.2276633385627,
+        768.6921067481256
+      ],
+      "size": [
+        270,
+        126
+      ],
+      "flags": {},
+      "order": 31,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 207
+        },
+        {
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            209
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "b2c98aa65c139defd0d9782bf5626fc1ad90bcbc",
+        "Node name for S&R": "LLSMaskProcess"
+      },
+      "widgets_values": [
+        "blur",
+        0.5,
+        8
+      ]
+    },
+    {
+      "id": 122,
+      "type": "LLSSimpleMaskCreate",
+      "pos": [
+        2222.24189237028,
+        769.8421022777408
+      ],
+      "size": [
+        270,
+        386
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "input_mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask_image",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            207
+          ]
+        },
+        {
+          "name": "area_info",
+          "type": "LLS_MASK_INFO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "fd5a2b9de2bd67ca913139e16992300b4681acfe",
+        "Node name for S&R": "LLSSimpleMaskCreate"
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        "rectangle",
+        "percent",
+        0.5,
+        0.5,
+        0.3,
+        0.3,
+        0.15,
+        0,
+        0,
+        false,
+        "replace"
+      ]
+    },
+    {
+      "id": 131,
+      "type": "LLSSaveImage",
+      "pos": [
+        2823.1651317031988,
+        729.7464701931868
+      ],
+      "size": [
+        270,
+        438.0000000000001
+      ],
+      "flags": {},
+      "order": 48,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": 209
+        },
+        {
+          "name": "prompt_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "latent_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "sample_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "decode_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "upscale_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "23dd271e39c4a99e3e9c01eabfb8ca5f181ca92e",
+        "Node name for S&R": "LLSSaveImage"
+      },
+      "widgets_values": [
+        "LLS",
+        "save",
+        true
+      ]
+    },
+    {
+      "id": 143,
+      "type": "PreviewImage",
+      "pos": [
+        3187.361529770358,
+        1897.0390742851262
+      ],
+      "size": [
+        140,
+        246
+      ],
+      "flags": {},
+      "order": 50,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 220
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 141,
+      "type": "LLSSaveImage",
+      "pos": [
+        3198.716038395371,
+        1378.4588463141515
+      ],
+      "size": [
+        270,
+        438.0000000000001
+      ],
+      "flags": {},
+      "order": 49,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 218
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "name": "prompt_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "latent_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "sample_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "decode_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "upscale_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "23dd271e39c4a99e3e9c01eabfb8ca5f181ca92e",
+        "Node name for S&R": "LLSSaveImage"
+      },
+      "widgets_values": [
+        "LLS",
+        "save",
+        false
+      ]
+    },
+    {
+      "id": 138,
+      "type": "SAM2ModelLoader (segment anything2)",
+      "pos": [
+        2230.998364108415,
+        1312.508162606385
+      ],
+      "size": [
+        368.3541015625,
+        58
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SAM2_MODEL",
+          "type": "SAM2_MODEL",
+          "links": [
+            215
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-sam2",
+        "ver": "e75eabcc12efd4aa9b5c6f72274d759973d36d4d",
+        "Node name for S&R": "SAM2ModelLoader (segment anything2)"
+      },
+      "widgets_values": [
+        "sam2_hiera_tiny"
+      ]
+    },
+    {
+      "id": 139,
+      "type": "GroundingDinoModelLoader (segment anything2)",
+      "pos": [
+        2209.859944649806,
+        1427.8761114915812
+      ],
+      "size": [
+        427.9361328125,
+        58
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "GROUNDING_DINO_MODEL",
+          "type": "GROUNDING_DINO_MODEL",
+          "links": [
+            216
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-sam2",
+        "ver": "e75eabcc12efd4aa9b5c6f72274d759973d36d4d",
+        "Node name for S&R": "GroundingDinoModelLoader (segment anything2)"
+      },
+      "widgets_values": [
+        "GroundingDINO_SwinB (938MB)"
+      ]
+    },
+    {
+      "id": 140,
+      "type": "LoadImage",
+      "pos": [
+        2246.5264591377363,
+        1540.359949673408
+      ],
+      "size": [
+        270,
+        314
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            217,
+            219
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "ChatGPT Image 2026年5月21日 15_37_32.png",
+        "image"
+      ]
+    },
+    {
+      "id": 103,
+      "type": "LLSSaveImage",
+      "pos": [
+        3789.6190884274342,
+        -724.5560137536298
+      ],
+      "size": [
+        320,
+        418.0000000000001
+      ],
+      "flags": {},
+      "order": 76,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 177
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "label": "prompt_info",
+          "name": "prompt_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": 178
+        },
+        {
+          "label": "latent_info",
+          "name": "latent_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "label": "sample_info",
+          "name": "sample_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": 179
+        },
+        {
+          "label": "decode_info",
+          "name": "decode_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": 180
+        },
+        {
+          "label": "upscale_info",
+          "name": "upscale_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSaveImage"
+      },
+      "widgets_values": [
+        "LLS-Inpaint",
+        "preview_only",
+        true
+      ]
+    },
+    {
+      "id": 120,
+      "type": "LoadImage",
+      "pos": [
+        2220.383128083975,
+        48.255625520504324
+      ],
+      "size": [
+        270,
+        314.00000000000006
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            202
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "ChatGPT Image 2026年5月21日 15_37_32.png",
+        "image"
+      ]
+    },
+    {
+      "id": 121,
+      "type": "LoadImage",
+      "pos": [
+        2215.860963593743,
+        402.0811344573192
+      ],
+      "size": [
+        270,
+        314.0000000000001
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            203
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "ChatGPT Image 2026年5月25日 11_13_29.png",
+        "image"
+      ]
+    },
+    {
+      "id": 133,
+      "type": "LLSSimpleMaskCreate",
+      "pos": [
+        3123.9923353751624,
+        61.31407531269412
+      ],
+      "size": [
+        270,
+        386
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "input_mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask_image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            214,
+            252
+          ]
+        },
+        {
+          "name": "area_info",
+          "type": "LLS_MASK_INFO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "b2c98aa65c139defd0d9782bf5626fc1ad90bcbc",
+        "Node name for S&R": "LLSSimpleMaskCreate"
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        "rectangle",
+        "percent",
+        0.5,
+        0.5,
+        0.3,
+        0.3,
+        0.15,
+        0,
+        0,
+        false,
+        "replace"
+      ]
+    },
+    {
+      "id": 134,
+      "type": "LLSSimpleMaskCreate",
+      "pos": [
+        3127.136096111542,
+        520.6281219787958
+      ],
+      "size": [
+        270,
+        386
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "input_mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask_image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            213,
+            251
+          ]
+        },
+        {
+          "name": "area_info",
+          "type": "LLS_MASK_INFO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "b2c98aa65c139defd0d9782bf5626fc1ad90bcbc",
+        "Node name for S&R": "LLSSimpleMaskCreate"
+      },
+      "widgets_values": [
+        2044,
+        2048,
+        "rectangle",
+        "percent",
+        0.5,
+        0.5,
+        0.3,
+        0.3,
+        0.15,
+        0,
+        0,
+        false,
+        "replace"
+      ]
+    },
+    {
+      "id": 136,
+      "type": "LLSSaveImage",
+      "pos": [
+        3766.3787103180193,
+        66.67021595958683
+      ],
+      "size": [
+        270,
+        438.0000000000001
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": 212
+        },
+        {
+          "name": "prompt_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "latent_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "sample_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "decode_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "upscale_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "23dd271e39c4a99e3e9c01eabfb8ca5f181ca92e",
+        "Node name for S&R": "LLSSaveImage"
+      },
+      "widgets_values": [
+        "LLS",
+        "save",
+        false
+      ]
+    },
+    {
+      "id": 152,
+      "type": "PreviewImage",
+      "pos": [
+        3794.1470787794174,
+        556.5116592827329
+      ],
+      "size": [
+        140,
+        246
+      ],
+      "flags": {},
+      "order": 53,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 245
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 154,
       "type": "MaskToImage",
       "pos": [
-        462.9061526450311,
-        2196.6889046178353
+        3795.310199491296,
+        855.8452035213437
       ],
       "size": [
         140,
         26
       ],
       "flags": {},
-      "order": 15,
+      "order": 54,
       "mode": 0,
       "inputs": [
         {
           "name": "mask",
           "type": "MASK",
-          "link": 109
+          "link": 249
         }
       ],
       "outputs": [
@@ -1459,7 +2693,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            108
+            250
           ]
         }
       ],
@@ -1471,24 +2705,24 @@
       "widgets_values": []
     },
     {
-      "id": 74,
+      "id": 155,
       "type": "PreviewImage",
       "pos": [
-        471.1423392552832,
-        2269.6994615889325
+        3795.7052492797984,
+        942.4160692630528
       ],
       "size": [
         140,
         246
       ],
       "flags": {},
-      "order": 22,
-      "mode": 0,
+      "order": 64,
+      "mode": 4,
       "inputs": [
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 108
+          "link": 250
         }
       ],
       "outputs": [],
@@ -1500,121 +2734,109 @@
       "widgets_values": []
     },
     {
-      "id": 68,
-      "type": "LLSProKSamplerBridge",
+      "id": 153,
+      "type": "LLSConcatByTarget",
       "pos": [
-        1573.8219895256148,
-        1775.28328620625
+        3433.366883457877,
+        514.9160091380451
       ],
       "size": [
-        270,
-        426
+        294.1015625,
+        358
       ],
       "flags": {},
-      "order": 26,
-      "mode": 0,
+      "order": 36,
+      "mode": 4,
       "inputs": [
         {
-          "name": "model",
-          "type": "MODEL",
-          "link": 126
+          "name": "a",
+          "shape": 7,
+          "type": "*",
+          "link": 252
         },
         {
-          "name": "positive",
-          "type": "CONDITIONING",
-          "link": 106
+          "name": "b",
+          "shape": 7,
+          "type": "*",
+          "link": 251
         },
         {
-          "name": "negative",
-          "type": "CONDITIONING",
-          "link": 107
+          "name": "image/mask_A",
+          "shape": 7,
+          "type": "IMAGE,MASK",
+          "link": null
         },
         {
-          "name": "latent_image",
-          "type": "LATENT",
-          "link": 105
+          "name": "image/mask_B",
+          "shape": 7,
+          "type": "IMAGE,MASK",
+          "link": null
         }
       ],
       "outputs": [
         {
-          "name": "latent",
-          "type": "LATENT",
+          "name": "image",
+          "type": "IMAGE",
           "links": [
-            121
+            245
           ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            249
+          ]
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null
         }
       ],
       "properties": {
         "aux_id": "Gin3601/LLS-node",
-        "ver": "0be470bcb6513b12c60deac974e3232cbf85aaa8",
-        "Node name for S&R": "LLSProKSamplerBridge"
+        "ver": "58a1564e4e1f03d4619f6779d5eca40eaaaebe2a",
+        "Node name for S&R": "LLSConcatByTarget"
       },
       "widgets_values": [
-        "enable",
-        54136361244841,
-        "randomize",
-        20,
-        1,
-        "euler",
-        "simple",
+        "IMAGE",
+        "A",
+        "right",
+        true,
+        "keep_proportion",
+        "center",
         0,
-        10000,
-        "disable"
+        "#000000",
+        0,
+        0,
+        true
       ]
     },
     {
-      "id": 78,
-      "type": "PreviewImage",
+      "id": 161,
+      "type": "MaskToImage",
       "pos": [
-        1575.9785110466012,
-        2258.741591037431
+        4562.013877575942,
+        2.4950151891255232
       ],
       "size": [
         140,
-        246
+        26
       ],
       "flags": {},
-      "order": 33,
-      "mode": 0,
+      "order": 57,
+      "mode": 4,
       "inputs": [
         {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 127
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.21.0",
-        "Node name for S&R": "PreviewImage"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 76,
-      "type": "VAEDecode",
-      "pos": [
-        1770.7916093325227,
-        2229.7307412470172
-      ],
-      "size": [
-        140,
-        46
-      ],
-      "flags": {},
-      "order": 29,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "samples",
-          "type": "LATENT",
-          "link": 121
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": 122
+          "name": "mask",
+          "type": "MASK",
+          "link": 261
         }
       ],
       "outputs": [
@@ -1622,37 +2844,372 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            123,
-            127
+            260
           ]
         }
       ],
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.21.0",
-        "Node name for S&R": "VAEDecode"
+        "Node name for S&R": "MaskToImage"
       },
       "widgets_values": []
     },
     {
-      "id": 77,
+      "id": 144,
+      "type": "LLSSaveImage",
+      "pos": [
+        6209.039012429926,
+        -710.6857195134594
+      ],
+      "size": [
+        320,
+        438
+      ],
+      "flags": {},
+      "order": 81,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 221
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "label": "prompt_info",
+          "name": "prompt_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": 222
+        },
+        {
+          "label": "latent_info",
+          "name": "latent_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": 263
+        },
+        {
+          "label": "sample_info",
+          "name": "sample_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": 223
+        },
+        {
+          "label": "decode_info",
+          "name": "decode_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": 224
+        },
+        {
+          "label": "upscale_info",
+          "name": "upscale_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSaveImage"
+      },
+      "widgets_values": [
+        "LLS-Inpaint",
+        "preview_only",
+        false
+      ]
+    },
+    {
+      "id": 166,
+      "type": "StyleModelApply",
+      "pos": [
+        5366.961340220059,
+        -332.2696331874335
+      ],
+      "size": [
+        270,
+        122
+      ],
+      "flags": {},
+      "order": 56,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 269
+        },
+        {
+          "name": "style_model",
+          "type": "STYLE_MODEL",
+          "link": 274
+        },
+        {
+          "name": "clip_vision_output",
+          "type": "CLIP_VISION_OUTPUT",
+          "link": 273
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            270
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "StyleModelApply"
+      },
+      "widgets_values": [
+        1,
+        "multiply"
+      ]
+    },
+    {
+      "id": 164,
+      "type": "CLIPVisionLoader",
+      "pos": [
+        4744.900988083825,
+        -123.78309577789953
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP_VISION",
+          "type": "CLIP_VISION",
+          "links": [
+            265
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "CLIPVisionLoader"
+      },
+      "widgets_values": [
+        "sigclip_vision_patch14_384.safetensors"
+      ]
+    },
+    {
+      "id": 167,
+      "type": "StyleModelLoader",
+      "pos": [
+        4739.467672132322,
+        -22.379441427432475
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "STYLE_MODEL",
+          "type": "STYLE_MODEL",
+          "links": [
+            274
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "StyleModelLoader"
+      },
+      "widgets_values": [
+        "flux1-redux-dev.safetensors"
+      ]
+    },
+    {
+      "id": 163,
+      "type": "CLIPVisionEncode",
+      "pos": [
+        5048.355841494235,
+        -135.08527956353785
+      ],
+      "size": [
+        270,
+        78
+      ],
+      "flags": {},
+      "order": 39,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "clip_vision",
+          "type": "CLIP_VISION",
+          "link": 265
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 264
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CLIP_VISION_OUTPUT",
+          "type": "CLIP_VISION_OUTPUT",
+          "links": [
+            273
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "CLIPVisionEncode"
+      },
+      "widgets_values": [
+        "center"
+      ]
+    },
+    {
+      "id": 137,
+      "type": "GroundingDinoSAM2Segment (segment anything2)",
+      "pos": [
+        2675.26851917686,
+        1411.532260053672
+      ],
+      "size": [
+        439.290625,
+        146
+      ],
+      "flags": {},
+      "order": 32,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "sam_model",
+          "type": "SAM2_MODEL",
+          "link": 215
+        },
+        {
+          "name": "grounding_dino_model",
+          "type": "GROUNDING_DINO_MODEL",
+          "link": 216
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 217
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            218
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-sam2",
+        "ver": "e75eabcc12efd4aa9b5c6f72274d759973d36d4d",
+        "Node name for S&R": "GroundingDinoSAM2Segment (segment anything2)"
+      },
+      "widgets_values": [
+        "table",
+        0.3,
+        false
+      ]
+    },
+    {
+      "id": 132,
+      "type": "LLSMaskCombine",
+      "pos": [
+        3468.3252919140027,
+        76.12255484189926
+      ],
+      "size": [
+        270,
+        78
+      ],
+      "flags": {},
+      "order": 35,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "mask_a",
+          "type": "MASK",
+          "link": 213
+        },
+        {
+          "name": "mask_b",
+          "type": "MASK",
+          "link": 214
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            212
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "b2c98aa65c139defd0d9782bf5626fc1ad90bcbc",
+        "Node name for S&R": "LLSMaskCombine"
+      },
+      "widgets_values": [
+        "max"
+      ]
+    },
+    {
+      "id": 159,
       "type": "PreviewImage",
       "pos": [
-        1956.0387799316306,
-        2261.944203766211
+        4555.1636338970475,
+        -301.61603995079247
       ],
       "size": [
         140,
         246
       ],
       "flags": {},
-      "order": 35,
-      "mode": 0,
+      "order": 55,
+      "mode": 4,
       "inputs": [
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 124
+          "link": 256
         }
       ],
       "outputs": [],
@@ -1664,255 +3221,1558 @@
       "widgets_values": []
     },
     {
-      "id": 69,
-      "type": "LLSProImageEditFinish",
+      "id": 162,
+      "type": "PreviewImage",
       "pos": [
-        1881.622685822949,
-        1810.165053545536
+        4592.814517502649,
+        79.43612410449856
       ],
       "size": [
-        298.25,
-        286
+        140,
+        246
       ],
       "flags": {},
-      "order": 32,
-      "mode": 0,
+      "order": 66,
+      "mode": 4,
       "inputs": [
         {
-          "name": "original_image",
+          "name": "images",
           "type": "IMAGE",
-          "link": 120
-        },
+          "link": 260
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 156,
+      "type": "LLSConcatByTarget",
+      "pos": [
+        4541.7984432935755,
+        -707.8337258936274
+      ],
+      "size": [
+        294.1015625,
+        358
+      ],
+      "flags": {},
+      "order": 38,
+      "mode": 4,
+      "inputs": [
         {
-          "name": "generated_image",
-          "type": "IMAGE",
-          "link": 123
-        },
-        {
-          "name": "edit_info",
-          "type": "LLS_EDIT_INFO",
-          "link": 119
-        },
-        {
-          "name": "work_mask",
+          "name": "a",
           "shape": 7,
-          "type": "MASK",
-          "link": 128
+          "type": "*",
+          "link": 254
+        },
+        {
+          "name": "b",
+          "shape": 7,
+          "type": "*",
+          "link": 255
+        },
+        {
+          "name": "image/mask_A",
+          "shape": 7,
+          "type": "IMAGE,MASK",
+          "link": null
+        },
+        {
+          "name": "image/mask_B",
+          "shape": 7,
+          "type": "IMAGE,MASK",
+          "link": null
         }
       ],
       "outputs": [
         {
-          "name": "final_image",
+          "name": "image",
           "type": "IMAGE",
           "links": [
-            124
+            253,
+            256
           ]
         },
         {
-          "name": "preview_image",
-          "type": "IMAGE",
+          "name": "mask",
+          "type": "MASK",
+          "links": []
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "height",
+          "type": "INT",
           "links": null
         }
       ],
       "properties": {
         "aux_id": "Gin3601/LLS-node",
-        "ver": "0be470bcb6513b12c60deac974e3232cbf85aaa8",
-        "Node name for S&R": "LLSProImageEditFinish"
+        "ver": "58a1564e4e1f03d4619f6779d5eca40eaaaebe2a",
+        "Node name for S&R": "LLSConcatByTarget"
       },
       "widgets_values": [
-        8,
-        "disabled",
-        "enabled",
-        1,
+        "IMAGE",
+        "A",
+        "left",
         true,
-        "soft",
-        "final",
-        ""
+        "keep_proportion",
+        "center",
+        0,
+        "#000000",
+        0,
+        0,
+        true
       ]
     },
     {
-      "id": 67,
-      "type": "LLSProImageEditPrepare",
+      "id": 157,
+      "type": "LoadImage",
       "pos": [
-        1245.6407807217158,
-        1789.7759397701054
+        4234.405928961169,
+        -714.0246962979284
       ],
       "size": [
-        286.025390625,
-        586
+        270,
+        314
       ],
       "flags": {},
-      "order": 23,
-      "mode": 0,
+      "order": 18,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            254
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            257
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "LoadImage",
+        "image": "clipspace/clipspace-painted-masked-1779764167625.png [input]"
+      },
+      "widgets_values": [
+        "clipspace/clipspace-painted-masked-1779764167625.png [input]",
+        "image"
+      ]
+    },
+    {
+      "id": 160,
+      "type": "LLSConcatByTarget",
+      "pos": [
+        4229.019063986448,
+        7.352175424164066
+      ],
+      "size": [
+        294.1015625,
+        358
+      ],
+      "flags": {},
+      "order": 40,
+      "mode": 4,
       "inputs": [
+        {
+          "name": "a",
+          "shape": 7,
+          "type": "*",
+          "link": 257
+        },
+        {
+          "name": "b",
+          "shape": 7,
+          "type": "*",
+          "link": 258
+        },
+        {
+          "name": "image/mask_A",
+          "shape": 7,
+          "type": "IMAGE,MASK",
+          "link": null
+        },
+        {
+          "name": "image/mask_B",
+          "shape": 7,
+          "type": "IMAGE,MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 110
+          "links": []
         },
         {
           "name": "mask",
           "type": "MASK",
-          "link": 111
+          "links": [
+            261,
+            282
+          ]
         },
         {
+          "name": "width",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "58a1564e4e1f03d4619f6779d5eca40eaaaebe2a",
+        "Node name for S&R": "LLSConcatByTarget"
+      },
+      "widgets_values": [
+        "IMAGE",
+        "A",
+        "left",
+        true,
+        "keep_proportion",
+        "center",
+        0,
+        "#000000",
+        0,
+        0,
+        true
+      ]
+    },
+    {
+      "id": 147,
+      "type": "LLSNativeInpaintConditioning",
+      "pos": [
+        5339.996177708129,
+        -704.7295433218912
+      ],
+      "size": [
+        400,
+        230
+      ],
+      "flags": {},
+      "order": 65,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 232
+        },
+        {
+          "label": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 270
+        },
+        {
+          "label": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 272
+        },
+        {
+          "label": "vae",
           "name": "vae",
           "type": "VAE",
-          "link": 115
+          "link": 235
+        },
+        {
+          "label": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 253
+        },
+        {
+          "label": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "link": 282
+        },
+        {
+          "label": "model_info",
+          "name": "model_info",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "model_info"
+          },
+          "link": 236
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            225
+          ]
         },
         {
           "name": "positive",
           "type": "CONDITIONING",
-          "link": 116
+          "slot_index": 1,
+          "links": [
+            226
+          ]
         },
         {
           "name": "negative",
           "type": "CONDITIONING",
-          "link": 117
+          "slot_index": 2,
+          "links": [
+            227
+          ]
         },
         {
+          "name": "latent",
+          "type": "LATENT",
+          "slot_index": 3,
+          "links": [
+            228
+          ]
+        },
+        {
+          "name": "inpaint_info",
+          "type": "STRING",
+          "slot_index": 4,
+          "links": [
+            263
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSNativeInpaintConditioning"
+      },
+      "widgets_values": [
+        "auto",
+        1,
+        true,
+        ""
+      ]
+    },
+    {
+      "id": 145,
+      "type": "LLSSimpleKSampler",
+      "pos": [
+        5773.0338863874285,
+        -710.8540510431906
+      ],
+      "size": [
+        380,
+        446
+      ],
+      "flags": {},
+      "order": 72,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "model",
           "name": "model",
-          "shape": 7,
           "type": "MODEL",
-          "link": 112
+          "link": 225
+        },
+        {
+          "label": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 226
+        },
+        {
+          "label": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 227
+        },
+        {
+          "label": "latent_image",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 228
+        },
+        {
+          "label": "repair_info",
+          "name": "repair_info",
+          "shape": 7,
+          "type": "LLS_REPAIR_INFO",
+          "link": null
+        },
+        {
+          "label": "guidance_stack",
+          "name": "guidance_stack",
+          "shape": 7,
+          "type": "LLS_GUIDANCE_STACK",
+          "link": null
+        },
+        {
+          "label": "model_info",
+          "name": "model_info",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "model_info"
+          },
+          "link": 229
         }
       ],
       "outputs": [
         {
           "name": "latent",
           "type": "LATENT",
+          "slot_index": 0,
           "links": [
-            105
+            230
           ]
         },
         {
-          "name": "work_image",
-          "type": "IMAGE",
+          "name": "sample_info",
+          "type": "STRING",
+          "slot_index": 1,
           "links": [
-            120
-          ]
-        },
-        {
-          "name": "work_mask",
-          "type": "MASK",
-          "links": [
-            128
-          ]
-        },
-        {
-          "name": "edit_info",
-          "type": "LLS_EDIT_INFO",
-          "links": [
-            119
-          ]
-        },
-        {
-          "name": "recommended_denoise",
-          "type": "FLOAT",
-          "links": null
-        },
-        {
-          "name": "positive",
-          "type": "CONDITIONING",
-          "links": [
-            106
-          ]
-        },
-        {
-          "name": "negative",
-          "type": "CONDITIONING",
-          "links": [
-            107
+            223
           ]
         }
       ],
       "properties": {
         "aux_id": "Gin3601/LLS-node",
-        "ver": "0be470bcb6513b12c60deac974e3232cbf85aaa8",
-        "Node name for S&R": "LLSProImageEditPrepare"
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSimpleKSampler"
       },
       "widgets_values": [
+        "Family Default",
+        1091867505123090,
+        "randomize",
+        20,
+        7,
+        "euler",
+        "normal",
+        1,
+        "manual",
         "auto",
-        "crop",
-        24,
-        8,
-        0.5,
-        false,
-        64,
-        1.5,
-        256,
-        1024,
-        "fit",
-        0,
-        0,
-        0,
-        0,
-        "edge",
-        "enabled",
+        3.5,
+        "Auto",
         ""
       ]
     },
     {
-      "id": 70,
-      "type": "LLSSimpleCheckpointLoader",
+      "id": 148,
+      "type": "LLSUniversalPromptEncode",
       "pos": [
-        737.7465024947212,
-        1794.7933889839026
+        4949.496564283175,
+        -399.3409713054495
       ],
       "size": [
-        303.159765625,
+        360,
+        230
+      ],
+      "flags": {},
+      "order": 37,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "text_encoder",
+          "name": "text_encoder",
+          "type": "CLIP",
+          "link": 237
+        },
+        {
+          "label": "model_info",
+          "name": "model_info",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "model_info"
+          },
+          "link": 238
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            269
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "slot_index": 1,
+          "links": [
+            272
+          ]
+        },
+        {
+          "name": "prompt_info",
+          "type": "STRING",
+          "slot_index": 2,
+          "links": [
+            222
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSUniversalPromptEncode"
+      },
+      "widgets_values": [
+        "Replace the items in image 1 with those in image 2\n",
+        "",
+        -1,
+        ""
+      ]
+    },
+    {
+      "id": 149,
+      "type": "LLSUniversalModelLoader",
+      "pos": [
+        4931.028257269626,
+        -731.13068894628
+      ],
+      "size": [
+        360,
         286
       ],
       "flags": {},
-      "order": 7,
+      "order": 19,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "slot_index": 0,
+          "links": [
+            232
+          ]
+        },
+        {
+          "name": "text_encoder",
+          "type": "CLIP",
+          "slot_index": 1,
+          "links": [
+            237
+          ]
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "slot_index": 2,
+          "links": [
+            231,
+            235
+          ]
+        },
+        {
+          "name": "model_info",
+          "type": "STRING",
+          "slot_index": 3,
+          "links": [
+            229,
+            236,
+            238
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSUniversalModelLoader"
+      },
+      "widgets_values": [
+        "diffusion_models/flux1-fill-dev-OneReward-fp16.safetensors",
+        "Auto",
+        "simple",
+        "auto",
+        "auto",
+        "clip_l.safetensors",
+        "t5xxl_fp8_e4m3fn.safetensors",
+        "ae.safetensors"
+      ]
+    },
+    {
+      "id": 158,
+      "type": "LoadImage",
+      "pos": [
+        4236.279777633837,
+        -352.8205936116678
+      ],
+      "size": [
+        270,
+        314
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            255,
+            264
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            258
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "ChatGPT Image 2026年5月25日 18_14_30.png",
+        "image"
+      ]
+    },
+    {
+      "id": 146,
+      "type": "LLSSimpleVAEDecode",
+      "pos": [
+        5768.142772295377,
+        -222.81595090950506
+      ],
+      "size": [
+        270,
+        80
+      ],
+      "flags": {},
+      "order": 77,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "samples",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 230
+        },
+        {
+          "label": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 231
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            221
+          ]
+        },
+        {
+          "name": "decode_info",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": [
+            224
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSimpleVAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 174,
+      "type": "LLSSimpleKSampler",
+      "pos": [
+        5157.4048541346565,
+        554.5402137806709
+      ],
+      "size": [
+        380,
+        446
+      ],
+      "flags": {},
+      "order": 78,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 288
+        },
+        {
+          "label": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": null
+        },
+        {
+          "label": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 292
+        },
+        {
+          "label": "latent_image",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 310
+        },
+        {
+          "label": "repair_info",
+          "name": "repair_info",
+          "shape": 7,
+          "type": "LLS_REPAIR_INFO",
+          "link": null
+        },
+        {
+          "label": "guidance_stack",
+          "name": "guidance_stack",
+          "shape": 7,
+          "type": "LLS_GUIDANCE_STACK",
+          "link": null
+        },
+        {
+          "label": "model_info",
+          "name": "model_info",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "model_info"
+          },
+          "link": 284
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            294
+          ]
+        },
+        {
+          "name": "sample_info",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": [
+            285
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSimpleKSampler"
+      },
+      "widgets_values": [
+        "Family Default",
+        742686255920821,
+        "randomize",
+        20,
+        7,
+        "euler",
+        "normal",
+        1,
+        "manual",
+        "auto",
+        3.5,
+        "Auto",
+        ""
+      ]
+    },
+    {
+      "id": 178,
+      "type": "LLSSimpleVAEDecode",
+      "pos": [
+        5557.887734766221,
+        534.1902508849549
+      ],
+      "size": [
+        270,
+        80
+      ],
+      "flags": {},
+      "order": 82,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "samples",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 294
+        },
+        {
+          "label": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 295
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            296
+          ]
+        },
+        {
+          "name": "decode_info",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": [
+            297
+          ]
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSimpleVAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 181,
+      "type": "PreviewImage",
+      "pos": [
+        5774.149022762449,
+        1026.92567909516
+      ],
+      "size": [
+        140,
+        246
+      ],
+      "flags": {},
+      "order": 85,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 304
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 180,
+      "type": "LLSSimpleVAEDecode",
+      "pos": [
+        5471.8508018423645,
+        1020.816175721923
+      ],
+      "size": [
+        270,
+        80
+      ],
+      "flags": {},
+      "order": 83,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "samples",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 302
+        },
+        {
+          "label": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 303
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            304
+          ]
+        },
+        {
+          "name": "decode_info",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": []
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSimpleVAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 175,
+      "type": "LLSSaveImage",
+      "pos": [
+        5912.579571603798,
+        539.9845467632551
+      ],
+      "size": [
+        320,
+        438
+      ],
+      "flags": {},
+      "order": 84,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 296
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "label": "prompt_info",
+          "name": "prompt_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "label": "latent_info",
+          "name": "latent_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "label": "sample_info",
+          "name": "sample_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": 285
+        },
+        {
+          "label": "decode_info",
+          "name": "decode_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": 297
+        },
+        {
+          "label": "upscale_info",
+          "name": "upscale_info",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSSaveImage"
+      },
+      "widgets_values": [
+        "LLS-Inpaint",
+        "preview_only",
+        false
+      ]
+    },
+    {
+      "id": 179,
+      "type": "KSampler",
+      "pos": [
+        5159.761835603198,
+        1051.9595468425046
+      ],
+      "size": [
+        270,
+        262
+      ],
+      "flags": {},
+      "order": 79,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 298
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 311
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 299
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 309
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            302
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        550102199187131,
+        "randomize",
+        20,
+        8,
+        "euler",
+        "simple",
+        1
+      ]
+    },
+    {
+      "id": 176,
+      "type": "ConditioningZeroOut",
+      "pos": [
+        5015.726509142697,
+        505.82173790736243
+      ],
+      "size": [
+        140,
+        26
+      ],
+      "flags": {},
+      "order": 73,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 308
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            292,
+            299
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "ConditioningZeroOut"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 142,
+      "type": "RMBG",
+      "pos": [
+        2697.994702282822,
+        1647.075214373454
+      ],
+      "size": [
+        340,
+        292
+      ],
+      "flags": {},
+      "order": 33,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 219
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            220
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "name": "MASK_IMAGE",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-rmbg",
+        "ver": "d7402513f23f58db7d56754b02a4f51a148b4941",
+        "Node name for S&R": "RMBG"
+      },
+      "widgets_values": [
+        "RMBG-2.0",
+        1,
+        1024,
+        0,
+        0,
+        false,
+        false,
+        "Alpha",
+        "#222222"
+      ],
+      "color": "#222e40",
+      "bgcolor": "#364254"
+    },
+    {
+      "id": 177,
+      "type": "LoadImage",
+      "pos": [
+        4187.922385922022,
+        930.1311465847385
+      ],
+      "size": [
+        270,
+        314.0000000000001
+      ],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            307,
+            312
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "ChatGPT Image 2026年5月25日 18_14_30.png",
+        "image"
+      ]
+    },
+    {
+      "id": 184,
+      "type": "MaskToImage",
+      "pos": [
+        4839.104503425531,
+        1041.0210556938866
+      ],
+      "size": [
+        140,
+        26
+      ],
+      "flags": {},
+      "order": 59,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 313
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            314
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "MaskToImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 173,
+      "type": "LLSUniversalModelLoader",
+      "pos": [
+        4310.346821978522,
+        574.6834073052217
+      ],
+      "size": [
+        360,
+        286
+      ],
+      "flags": {},
+      "order": 22,
       "mode": 0,
       "inputs": [],
       "outputs": [
         {
           "name": "model",
           "type": "MODEL",
+          "slot_index": 0,
           "links": [
-            112,
-            126
-          ]
-        },
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "links": [
-            113
-          ]
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "links": [
-            115,
-            122
+            288,
+            298
           ]
         },
         {
           "name": "text_encoder",
           "type": "CLIP",
+          "slot_index": 1,
           "links": [
-            114
+            305
+          ]
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "slot_index": 2,
+          "links": [
+            295,
+            303,
+            306
+          ]
+        },
+        {
+          "name": "model_info",
+          "type": "STRING",
+          "slot_index": 3,
+          "links": [
+            284
           ]
         }
       ],
       "properties": {
         "aux_id": "Gin3601/LLS-node",
-        "ver": "3e97537f543c74db0e91a840d698105c5f269931",
-        "Node name for S&R": "LLSSimpleCheckpointLoader"
+        "ver": "d7aae497c2f23e3a5fa1b2739490454abd4a25db",
+        "Node name for S&R": "LLSUniversalModelLoader"
       },
       "widgets_values": [
-        "flux1-schnell-fp8.safetensors",
+        "diffusion_models/flux1-dev-fp8.safetensors",
         "Auto",
         "simple",
         "auto",
         "auto",
-        "(auto)",
-        "(auto)",
-        "(auto)"
+        "clip_l.safetensors",
+        "t5xxl_fp8_e4m3fn.safetensors",
+        "ae.safetensors"
+      ]
+    },
+    {
+      "id": 186,
+      "type": "PreviewImage",
+      "pos": [
+        4993.171719673187,
+        961.5826658505536
+      ],
+      "size": [
+        140,
+        246
+      ],
+      "flags": {},
+      "order": 58,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 315
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 185,
+      "type": "PreviewImage",
+      "pos": [
+        4819.602534431488,
+        1109.2114279905816
+      ],
+      "size": [
+        140,
+        246
+      ],
+      "flags": {},
+      "order": 67,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 314
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 183,
+      "type": "RMBG",
+      "pos": [
+        4473.832686322145,
+        941.6147801709899
+      ],
+      "size": [
+        340,
+        292
+      ],
+      "flags": {},
+      "order": 41,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 312
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            315
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            313,
+            316
+          ]
+        },
+        {
+          "name": "MASK_IMAGE",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-rmbg",
+        "ver": "d7402513f23f58db7d56754b02a4f51a148b4941",
+        "Node name for S&R": "RMBG"
+      },
+      "widgets_values": [
+        "RMBG-2.0",
+        1,
+        1024,
+        0,
+        0,
+        false,
+        false,
+        "Alpha",
+        "#222222"
+      ],
+      "color": "#222e40",
+      "bgcolor": "#364254"
+    },
+    {
+      "id": 187,
+      "type": "InvertMask",
+      "pos": [
+        4686.183361307727,
+        881.507749135441
+      ],
+      "size": [
+        140,
+        26
+      ],
+      "flags": {},
+      "order": 60,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 316
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [
+            317
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.21.0",
+        "Node name for S&R": "InvertMask"
+      }
+    },
+    {
+      "id": 182,
+      "type": "LLSFlux2KleinEditTextEncode",
+      "pos": [
+        4705.384059505954,
+        576.9978984300901
+      ],
+      "size": [
+        400,
+        260
+      ],
+      "flags": {},
+      "order": 68,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 305
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 306
+        },
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 307
+        },
+        {
+          "name": "image2",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "image3",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": 317
+        }
+      ],
+      "outputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "links": [
+            308,
+            311
+          ]
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            309,
+            310
+          ]
+        },
+        {
+          "name": "custom_output",
+          "type": "LLS_FLUX2KLEIN_OUTPUT",
+          "links": null
+        },
+        {
+          "name": "main_image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "Gin3601/LLS-node",
+        "ver": "f6bf21e439db74bf21d96157e231dbc99b45fc88",
+        "Node name for S&R": "LLSFlux2KleinEditTextEncode"
+      },
+      "widgets_values": [
+        "Place the kettle on the simple golden wooden table.",
+        1024,
+        "longest_edge",
+        "none"
       ]
     }
   ],
@@ -2230,188 +5090,788 @@
       "MASK"
     ],
     [
+      170,
+      104,
+      1,
+      101,
+      0,
+      "CLIP"
+    ],
+    [
+      171,
+      104,
+      3,
+      101,
+      1,
+      "STRING"
+    ],
+    [
+      172,
       105,
-      67,
       0,
-      68,
-      3,
-      "LATENT"
+      102,
+      0,
+      "MODEL"
     ],
     [
-      106,
-      67,
-      5,
-      68,
+      173,
+      105,
+      1,
+      102,
       1,
       "CONDITIONING"
     ],
     [
-      107,
-      67,
+      174,
+      105,
+      2,
+      102,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      175,
+      105,
+      3,
+      102,
+      3,
+      "LATENT"
+    ],
+    [
+      176,
+      104,
+      3,
+      102,
       6,
-      68,
+      "STRING"
+    ],
+    [
+      177,
+      106,
+      0,
+      103,
+      0,
+      "IMAGE"
+    ],
+    [
+      178,
+      101,
       2,
-      "CONDITIONING"
+      103,
+      2,
+      "STRING"
     ],
     [
-      108,
-      73,
-      0,
-      74,
-      0,
-      "IMAGE"
-    ],
-    [
-      109,
-      72,
+      179,
+      102,
       1,
-      73,
-      0,
-      "MASK"
+      103,
+      4,
+      "STRING"
     ],
     [
-      110,
-      72,
-      0,
-      67,
-      0,
-      "IMAGE"
-    ],
-    [
-      111,
-      72,
+      180,
+      106,
       1,
-      67,
-      1,
-      "MASK"
-    ],
-    [
-      112,
-      70,
-      0,
-      67,
+      103,
       5,
+      "STRING"
+    ],
+    [
+      181,
+      104,
+      0,
+      105,
+      0,
       "MODEL"
     ],
     [
-      113,
-      70,
-      1,
-      75,
-      1,
-      "CLIP"
-    ],
-    [
-      114,
-      70,
-      3,
-      75,
+      182,
+      101,
       0,
-      "CLIP"
+      105,
+      1,
+      "CONDITIONING"
     ],
     [
-      115,
-      70,
+      183,
+      101,
+      1,
+      105,
       2,
-      67,
+      "CONDITIONING"
+    ],
+    [
+      184,
+      104,
       2,
+      105,
+      3,
       "VAE"
     ],
     [
-      116,
-      75,
+      185,
+      100,
       0,
-      67,
-      3,
-      "CONDITIONING"
-    ],
-    [
-      117,
-      75,
-      1,
-      67,
+      105,
       4,
-      "CONDITIONING"
-    ],
-    [
-      119,
-      67,
-      3,
-      69,
-      2,
-      "LLS_EDIT_INFO"
-    ],
-    [
-      120,
-      67,
-      1,
-      69,
-      0,
       "IMAGE"
     ],
     [
-      121,
-      68,
+      186,
+      100,
+      1,
+      105,
+      5,
+      "MASK"
+    ],
+    [
+      187,
+      104,
+      3,
+      105,
+      6,
+      "STRING"
+    ],
+    [
+      188,
+      102,
       0,
-      76,
+      106,
       0,
       "LATENT"
     ],
     [
-      122,
-      70,
+      189,
+      104,
       2,
-      76,
+      106,
       1,
       "VAE"
     ],
     [
-      123,
-      76,
+      202,
+      120,
       0,
-      69,
+      119,
+      0,
+      "IMAGE"
+    ],
+    [
+      203,
+      121,
+      0,
+      119,
       1,
       "IMAGE"
     ],
     [
-      124,
-      69,
+      204,
+      119,
       0,
-      77,
-      0,
-      "IMAGE"
-    ],
-    [
-      126,
-      70,
-      0,
-      68,
-      0,
-      "MODEL"
-    ],
-    [
-      127,
-      76,
-      0,
-      78,
+      118,
       0,
       "IMAGE"
     ],
     [
-      128,
-      67,
-      2,
-      69,
-      3,
+      207,
+      122,
+      1,
+      129,
+      0,
       "MASK"
     ],
     [
+      209,
       129,
-      45,
       0,
-      52,
-      3,
+      131,
+      1,
+      "MASK"
+    ],
+    [
+      212,
+      132,
+      0,
+      136,
+      1,
+      "MASK"
+    ],
+    [
+      213,
+      134,
+      1,
+      132,
+      0,
+      "MASK"
+    ],
+    [
+      214,
+      133,
+      1,
+      132,
+      1,
+      "MASK"
+    ],
+    [
+      215,
+      138,
+      0,
+      137,
+      0,
+      "SAM2_MODEL"
+    ],
+    [
+      216,
+      139,
+      0,
+      137,
+      1,
+      "GROUNDING_DINO_MODEL"
+    ],
+    [
+      217,
+      140,
+      0,
+      137,
+      2,
+      "IMAGE"
+    ],
+    [
+      218,
+      137,
+      0,
+      141,
+      0,
+      "IMAGE"
+    ],
+    [
+      219,
+      140,
+      0,
+      142,
+      0,
+      "IMAGE"
+    ],
+    [
+      220,
+      142,
+      0,
+      143,
+      0,
+      "IMAGE"
+    ],
+    [
+      221,
+      146,
+      0,
+      144,
+      0,
+      "IMAGE"
+    ],
+    [
+      222,
+      148,
+      2,
+      144,
+      2,
+      "STRING"
+    ],
+    [
+      223,
+      145,
+      1,
+      144,
+      4,
+      "STRING"
+    ],
+    [
+      224,
+      146,
+      1,
+      144,
+      5,
+      "STRING"
+    ],
+    [
+      225,
+      147,
+      0,
+      145,
+      0,
       "MODEL"
+    ],
+    [
+      226,
+      147,
+      1,
+      145,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      227,
+      147,
+      2,
+      145,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      228,
+      147,
+      3,
+      145,
+      3,
+      "LATENT"
+    ],
+    [
+      229,
+      149,
+      3,
+      145,
+      6,
+      "STRING"
+    ],
+    [
+      230,
+      145,
+      0,
+      146,
+      0,
+      "LATENT"
+    ],
+    [
+      231,
+      149,
+      2,
+      146,
+      1,
+      "VAE"
+    ],
+    [
+      232,
+      149,
+      0,
+      147,
+      0,
+      "MODEL"
+    ],
+    [
+      235,
+      149,
+      2,
+      147,
+      3,
+      "VAE"
+    ],
+    [
+      236,
+      149,
+      3,
+      147,
+      6,
+      "STRING"
+    ],
+    [
+      237,
+      149,
+      1,
+      148,
+      0,
+      "CLIP"
+    ],
+    [
+      238,
+      149,
+      3,
+      148,
+      1,
+      "STRING"
+    ],
+    [
+      245,
+      153,
+      0,
+      152,
+      0,
+      "IMAGE"
+    ],
+    [
+      249,
+      153,
+      1,
+      154,
+      0,
+      "MASK"
+    ],
+    [
+      250,
+      154,
+      0,
+      155,
+      0,
+      "IMAGE"
+    ],
+    [
+      251,
+      134,
+      1,
+      153,
+      1,
+      "MASK"
+    ],
+    [
+      252,
+      133,
+      1,
+      153,
+      0,
+      "MASK"
+    ],
+    [
+      253,
+      156,
+      0,
+      147,
+      4,
+      "IMAGE"
+    ],
+    [
+      254,
+      157,
+      0,
+      156,
+      0,
+      "IMAGE"
+    ],
+    [
+      255,
+      158,
+      0,
+      156,
+      1,
+      "IMAGE"
+    ],
+    [
+      256,
+      156,
+      0,
+      159,
+      0,
+      "IMAGE"
+    ],
+    [
+      257,
+      157,
+      1,
+      160,
+      0,
+      "MASK"
+    ],
+    [
+      258,
+      158,
+      1,
+      160,
+      1,
+      "MASK"
+    ],
+    [
+      260,
+      161,
+      0,
+      162,
+      0,
+      "IMAGE"
+    ],
+    [
+      261,
+      160,
+      1,
+      161,
+      0,
+      "MASK"
+    ],
+    [
+      263,
+      147,
+      4,
+      144,
+      3,
+      "STRING"
+    ],
+    [
+      264,
+      158,
+      0,
+      163,
+      1,
+      "IMAGE"
+    ],
+    [
+      265,
+      164,
+      0,
+      163,
+      0,
+      "CLIP_VISION"
+    ],
+    [
+      269,
+      148,
+      0,
+      166,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      270,
+      166,
+      0,
+      147,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      272,
+      148,
+      1,
+      147,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      273,
+      163,
+      0,
+      166,
+      2,
+      "CLIP_VISION_OUTPUT"
+    ],
+    [
+      274,
+      167,
+      0,
+      166,
+      1,
+      "STYLE_MODEL"
+    ],
+    [
+      282,
+      160,
+      1,
+      147,
+      5,
+      "MASK"
+    ],
+    [
+      284,
+      173,
+      3,
+      174,
+      6,
+      "STRING"
+    ],
+    [
+      285,
+      174,
+      1,
+      175,
+      4,
+      "STRING"
+    ],
+    [
+      288,
+      173,
+      0,
+      174,
+      0,
+      "MODEL"
+    ],
+    [
+      292,
+      176,
+      0,
+      174,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      294,
+      174,
+      0,
+      178,
+      0,
+      "LATENT"
+    ],
+    [
+      295,
+      173,
+      2,
+      178,
+      1,
+      "VAE"
+    ],
+    [
+      296,
+      178,
+      0,
+      175,
+      0,
+      "IMAGE"
+    ],
+    [
+      297,
+      178,
+      1,
+      175,
+      5,
+      "STRING"
+    ],
+    [
+      298,
+      173,
+      0,
+      179,
+      0,
+      "MODEL"
+    ],
+    [
+      299,
+      176,
+      0,
+      179,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      302,
+      179,
+      0,
+      180,
+      0,
+      "LATENT"
+    ],
+    [
+      303,
+      173,
+      2,
+      180,
+      1,
+      "VAE"
+    ],
+    [
+      304,
+      180,
+      0,
+      181,
+      0,
+      "IMAGE"
+    ],
+    [
+      305,
+      173,
+      1,
+      182,
+      0,
+      "CLIP"
+    ],
+    [
+      306,
+      173,
+      2,
+      182,
+      1,
+      "VAE"
+    ],
+    [
+      307,
+      177,
+      0,
+      182,
+      2,
+      "IMAGE"
+    ],
+    [
+      308,
+      182,
+      0,
+      176,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      309,
+      182,
+      1,
+      179,
+      3,
+      "LATENT"
+    ],
+    [
+      310,
+      182,
+      1,
+      174,
+      3,
+      "LATENT"
+    ],
+    [
+      311,
+      182,
+      0,
+      179,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      312,
+      177,
+      0,
+      183,
+      0,
+      "IMAGE"
+    ],
+    [
+      313,
+      183,
+      1,
+      184,
+      0,
+      "MASK"
+    ],
+    [
+      314,
+      184,
+      0,
+      185,
+      0,
+      "IMAGE"
+    ],
+    [
+      315,
+      183,
+      0,
+      186,
+      0,
+      "IMAGE"
+    ],
+    [
+      316,
+      183,
+      1,
+      187,
+      0,
+      "MASK"
+    ],
+    [
+      317,
+      187,
+      0,
+      182,
+      5,
+      "MASK"
     ]
   ],
   "groups": [
@@ -2452,13 +5912,61 @@
       "flags": {}
     },
     {
-      "id": 4,
+      "id": 6,
       "title": "局部重绘",
       "bounding": [
-        412.93194220187274,
-        1688.320027500608,
-        1766.7951576945552,
-        1034.620764346542
+        2192.646245555202,
+        -815.4586809167743,
+        1967.6500954355906,
+        763.7839457443217
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 7,
+      "title": "局部重绘",
+      "bounding": [
+        2192.776289315687,
+        -27.0175336755992,
+        1961.7278095123943,
+        1236.715824303684
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 8,
+      "title": "Group",
+      "bounding": [
+        2193.965246587895,
+        1219.642146681117,
+        1954.2697373498927,
+        985.7810223756005
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 9,
+      "title": "万物迁移",
+      "bounding": [
+        4177.35119254152,
+        -814.7797467377438,
+        2400.6869042127673,
+        1202.4340429541958
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 10,
+      "title": "背景替换/电商详情图",
+      "bounding": [
+        4176.52579607565,
+        397.1117885588086,
+        2397.29147273778,
+        977.1688745418668
       ],
       "color": "#3f789e",
       "flags": {}
@@ -2467,10 +5975,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 1.0152559799477054,
+      "scale": 0.5958514526864833,
       "offset": [
-        -305.3695485210474,
-        -1540.0569475701045
+        -3524.654187801973,
+        -159.49781928334642
       ]
     },
     "frontendVersion": "1.43.18"

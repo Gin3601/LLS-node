@@ -448,6 +448,43 @@ class TestLoaderPromptRefactor(unittest.TestCase):
         self.assertEqual(payload["text_encoder_name"], "clip_l.safetensors, t5xxl_fp16.safetensors")
         self.assertEqual(payload["vae_name"], "ae.safetensors")
 
+    def test_universal_loader_loads_flux2_klein_with_qwen_and_flux2_vae(self):
+        load_plugin_package()
+        from lls_node_test_refactor.model_loader import nodes as loader_nodes
+
+        folder_paths = FolderPathsStub()
+        folder_paths._files["diffusion_models"].append("flux-2-klein-9b.safetensors")
+        folder_paths._files["text_encoders"].append("qwen_3_8b.safetensors")
+        folder_paths._files["vae"].append("flux2-vae.safetensors")
+
+        with mock.patch.object(loader_nodes, "folder_paths", folder_paths), mock.patch.object(
+            loader_nodes,
+            "comfy_sd",
+            ComfySDStub(),
+        ), mock.patch.object(loader_nodes, "comfy_core_nodes", CoreNodesStub()):
+            node = loader_nodes.LLSUniversalModelLoader()
+            model, text_encoder, vae, model_info = node.load(
+                "diffusion_models/flux-2-klein-9b.safetensors",
+                "Auto",
+                "advanced",
+                "external",
+                "external",
+                "qwen_3_8b.safetensors",
+                "(auto)",
+                "flux2-vae.safetensors",
+            )
+
+        payload = json.loads(model_info)
+        self.assertEqual(model.label, "MODEL::flux-2-klein-9b.safetensors")
+        self.assertEqual(text_encoder.label, "CLIP::flux2::qwen_3_8b.safetensors")
+        self.assertEqual(vae.label, "VAE::flux2-vae.safetensors")
+        self.assertEqual(payload["model_family"], "FLUX2_KLEIN")
+        self.assertEqual(payload["text_encoder_name_1"], "qwen_3_8b.safetensors")
+        self.assertEqual(payload["text_encoder_name_2"], "")
+        self.assertEqual(payload["text_encoder_name"], "qwen_3_8b.safetensors")
+        self.assertEqual(payload["vae_name"], "flux2-vae.safetensors")
+        self.assertEqual(text_encoder._lls_text_encoder_type, "flux2_qwen")
+
     def test_loader_raises_clear_error_when_flux_text_encoder_is_missing(self):
         load_plugin_package()
         from lls_node_test_refactor.model_loader import nodes as loader_nodes

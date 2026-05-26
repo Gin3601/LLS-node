@@ -41,6 +41,7 @@ from ..utils.model_info import (
     get_family_defaults,
     info_to_json,
     infer_family_from_name,
+    is_flux2_family,
     is_flux_family,
     is_sdxl_family,
     tag_lls_object,
@@ -62,6 +63,8 @@ _FLUX_T5_PATTERNS = ("t5xxl_fp8_e4m3fn.safetensors", "t5xxl_fp16.safetensors", "
 _SDXL_CLIP_L_PATTERNS = ("clip_l.safetensors", "clip_l", "clip-l")
 _SDXL_CLIP_G_PATTERNS = ("clip_g.safetensors", "clip_g", "clip-g")
 _FLUX_VAE_PATTERNS = ("ae.safetensors", "ae", "vae")
+_FLUX2_QWEN_PATTERNS = ("qwen_3_8b.safetensors", "qwen_3_8b_fp8mixed.safetensors", "qwen_3_8b")
+_FLUX2_VAE_PATTERNS = ("flux2-vae.safetensors", "flux2-vae", "flux2_vae")
 
 
 def _build_capability_tags(model_name: str, family: str) -> dict[str, object]:
@@ -226,6 +229,12 @@ def _load_external_text_encoder(family: str, name1: str, name2: str | None):
             raise RuntimeError("[LLS] ComfyUI core CLIPLoader class was not found.")
         return clip_loader_cls().load_clip(name1, type="stable_diffusion")[0]
 
+    if is_flux2_family(family):
+        clip_loader_cls = getattr(comfy_core_nodes, "CLIPLoader", None)
+        if clip_loader_cls is None:
+            raise RuntimeError("[LLS] ComfyUI core CLIPLoader class was not found.")
+        return clip_loader_cls().load_clip(name1, type="flux2")[0]
+
     dual_loader_cls = getattr(comfy_core_nodes, "DualCLIPLoader", None)
     if dual_loader_cls is None:
         raise RuntimeError("[LLS] ComfyUI core DualCLIPLoader class was not found.")
@@ -255,6 +264,10 @@ def _resolve_external_text_encoder_names(
             return name1, None
         return (_match_file(available, _SDXL_CLIP_L_PATTERNS) or available[0] if available else None, None)
 
+    if is_flux2_family(family):
+        resolved_1 = name1 or _match_file(available, _FLUX2_QWEN_PATTERNS)
+        return resolved_1, None
+
     if is_sdxl_family(family):
         resolved_1 = name1 or _match_file(available, _SDXL_CLIP_L_PATTERNS)
         resolved_2 = name2 or _match_file(available, _SDXL_CLIP_G_PATTERNS)
@@ -269,6 +282,8 @@ def _resolve_external_vae_name(family: str, name: str | None) -> str | None:
     if name:
         return name
     available = _get_filename_list("vae")
+    if is_flux2_family(family):
+        return _match_file(available, _FLUX2_VAE_PATTERNS)
     if is_flux_family(family):
         return _match_file(available, _FLUX_VAE_PATTERNS)
     return available[0] if available else None
@@ -284,6 +299,11 @@ def _missing_text_encoder_error(family: str, missing_role: str) -> RuntimeError:
         return RuntimeError(
             f"[LLS] Missing SDXL text encoder {filename}. "
             "Place it in ComfyUI/models/text_encoders/."
+        )
+    if is_flux2_family(family):
+        return RuntimeError(
+            "[LLS] Missing Flux2/Klein text encoder qwen_3_8b.safetensors "
+            "or qwen_3_8b_fp8mixed.safetensors. Place one of them in ComfyUI/models/text_encoders/."
         )
     filename = "clip_l.safetensors" if missing_role == "clip_l" else "t5xxl_fp8_e4m3fn.safetensors"
     fallback = (
@@ -323,6 +343,11 @@ def _resolve_text_encoder(
             if source == "auto" and embedded_text_encoder is not None:
                 return embedded_text_encoder, "embedded", None, None
             raise _missing_text_encoder_error(family, "clip")
+        return _load_external_text_encoder(family, resolved_1, None), "external", resolved_1, None
+
+    if is_flux2_family(family):
+        if not resolved_1:
+            raise _missing_text_encoder_error(family, "qwen_3_8b")
         return _load_external_text_encoder(family, resolved_1, None), "external", resolved_1, None
 
     required_role_1 = "clip_l"
@@ -366,6 +391,11 @@ def _resolve_vae(
 
     if resolved_vae_name:
         return _load_external_vae(resolved_vae_name), "external", resolved_vae_name
+
+    if is_flux2_family(family):
+        raise RuntimeError(
+            "[LLS] Missing Flux2/Klein VAE flux2-vae.safetensors. Place it in ComfyUI/models/vae/."
+        )
 
     if is_flux_family(family):
         raise RuntimeError(

@@ -12,6 +12,8 @@ try:
         FakeMask,
         FakeVAE,
         FakeTensor,
+        NativeEditModelStub,
+        NativeFluxStub,
         StandardClipStub,
         import_plugin_submodule,
         load_plugin_package,
@@ -22,6 +24,8 @@ except ImportError:
         FakeMask,
         FakeVAE,
         FakeTensor,
+        NativeEditModelStub,
+        NativeFluxStub,
         StandardClipStub,
         import_plugin_submodule,
         load_plugin_package,
@@ -136,6 +140,39 @@ class TestFlux2KleinNode(unittest.TestCase):
             self.assertTrue(torch.all(output_mask == 1))
         self.assertNotIn("noise_mask", latent)
         self.assertEqual(custom_output["latent_has_noise_mask"], False)
+
+    def test_flux2_official_path_uses_empty_latent_and_reference_latent_nodes(self):
+        NativeFluxStub.reset()
+        NativeEditModelStub.reset()
+
+        with mock.patch.object(self.module, "native_flux_nodes", NativeFluxStub, create=True), mock.patch.object(
+            self.module,
+            "native_edit_model_nodes",
+            NativeEditModelStub,
+            create=True,
+        ):
+            conditioning, latent, custom_output, main_image, output_mask = self.node.encode(
+                clip=StandardClipStub(),
+                vae=FakeVAE(latent_channels=128, downscale_ratio=16),
+                image1=FakeTensor((1, 832, 1248, 3), label="main"),
+                prompt="replace background with a clean kitchen scene",
+                ref_longest_edge=1248,
+                resize_mode="keep_original",
+                mask_mode="use_mask",
+                image2=FakeTensor((1, 640, 640, 3), label="ref2"),
+                image3=None,
+                mask=FakeMask((1, 832, 1248), mask_bbox=(50, 40, 500, 700), mask_area_ratio=0.35, label="mask"),
+            )
+
+        self.assertEqual(NativeFluxStub.last_empty_call, {"width": 1248, "height": 832, "batch_size": 1})
+        self.assertEqual(len(NativeEditModelStub.last_calls), 2)
+        self.assertEqual(latent["samples"].shape, (1, 128, 52, 78))
+        self.assertEqual(latent["noise_mask"].shape, (1, 52, 78))
+        self.assertEqual(custom_output["latent_mode"], "empty_flux2_latent")
+        self.assertEqual(custom_output["conditioning_backend"], "flux2klein_multivision_clip+reference_latent")
+        self.assertEqual(custom_output["reference_latent_count"], 2)
+        self.assertEqual(main_image.shape, (1, 832, 1248, 3))
+        self.assertEqual(output_mask.shape, (1, 832, 1248))
 
     def test_missing_clip_backend_raises_clear_error(self):
         with self.assertRaisesRegex(RuntimeError, "vision-aware|text encoding backend"):
