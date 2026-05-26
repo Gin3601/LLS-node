@@ -98,9 +98,18 @@ class StandardClipStub:
         self.tokenize_calls = []
         self.encode_calls = []
 
-    def tokenize(self, text):
-        self.tokenize_calls.append(text)
-        return {"text": text}
+    def tokenize(self, text, images=None, **kwargs):
+        self.tokenize_calls.append(
+            {
+                "text": text,
+                "images": list(images or []),
+                "kwargs": dict(kwargs),
+            }
+        )
+        return {
+            "text": text,
+            "image_count": len(images or []),
+        }
 
     def encode_from_tokens_scheduled(self, tokens, add_dict=None):
         self.encode_calls.append({"tokens": dict(tokens), "add_dict": dict(add_dict or {})})
@@ -137,14 +146,81 @@ class NativeQwenStub:
             return NodeOutputStub([["native-conditioning", {"source": "native-qwen"}]])
 
 
-class NativeFluxStub:
-    last_call = None
+class NativeCoreNodesStub:
+    last_text_call = None
+    last_vae_calls = []
 
-    class FluxKontextMultiReferenceLatentMethod:
+    @classmethod
+    def reset(cls):
+        cls.last_text_call = None
+        cls.last_vae_calls = []
+
+    class CLIPTextEncode:
         @staticmethod
-        def execute(conditioning, reference_latents_method):
-            NativeFluxStub.last_call = {
-                "conditioning": conditioning,
-                "reference_latents_method": reference_latents_method,
+        def execute(clip, prompt):
+            NativeCoreNodesStub.last_text_call = {
+                "clip": clip,
+                "prompt": prompt,
             }
-            return NodeOutputStub([["native-conditioning", {"reference_latents_method": reference_latents_method}]])
+            return NodeOutputStub([[f"native-text-conditioning::{prompt}", {"pooled_output": {}}]])
+
+    class VAEEncode:
+        @staticmethod
+        def execute(vae, image):
+            NativeCoreNodesStub.last_vae_calls.append(
+                {
+                    "vae": vae,
+                    "image": image,
+                }
+            )
+            return NodeOutputStub({"samples": vae.encode(image)})
+
+
+class NativeEditModelStub:
+    last_calls = []
+
+    @classmethod
+    def reset(cls):
+        cls.last_calls = []
+
+    class ReferenceLatent:
+        @staticmethod
+        def execute(conditioning, latent=None):
+            NativeEditModelStub.last_calls.append(
+                {
+                    "conditioning": conditioning,
+                    "latent": latent,
+                }
+            )
+            updated = []
+            for cond, meta in conditioning:
+                copied = dict(meta)
+                refs = list(copied.get("reference_latents", []))
+                refs.append(latent["samples"])
+                copied["reference_latents"] = refs
+                updated.append([cond, copied])
+            return NodeOutputStub(updated)
+
+
+class NativeFluxStub:
+    last_empty_call = None
+
+    @classmethod
+    def reset(cls):
+        cls.last_empty_call = None
+
+    class EmptyFlux2LatentImage:
+        @staticmethod
+        def execute(width, height, batch_size=1):
+            NativeFluxStub.last_empty_call = {
+                "width": width,
+                "height": height,
+                "batch_size": batch_size,
+            }
+            latent_height = max(1, int(height) // 16)
+            latent_width = max(1, int(width) // 16)
+            return NodeOutputStub(
+                {
+                    "samples": FakeLatentTensor((int(batch_size), 128, latent_height, latent_width)),
+                }
+            )

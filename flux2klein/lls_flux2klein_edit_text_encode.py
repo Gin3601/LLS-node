@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import importlib
+import math
 
-from ..conditioning.nodes import LLSUniversalPromptEncode
 from ..repair.repair_utils import (
     clamp_mask_values,
     get_image_size,
@@ -13,6 +12,11 @@ from ..repair.repair_utils import (
 )
 
 try:
+    import node_helpers
+except Exception:  # pragma: no cover - optional ComfyUI runtime dependency
+    node_helpers = None
+
+try:
     import torch
 except Exception as exc:  # pragma: no cover - optional runtime dependency
     torch = None
@@ -21,26 +25,19 @@ else:  # pragma: no cover - exercised in ComfyUI runtime/tests when torch exists
     _TORCH_ERR = None
 
 try:
-    nodes_qwen = importlib.import_module("comfy_extras.nodes_qwen")
-except Exception as exc:  # pragma: no cover - runtime-only import
-    nodes_qwen = None
-    _QWEN_ERR = exc
-else:  # pragma: no cover - runtime-only import
-    _QWEN_ERR = None
-
-try:
-    nodes_flux = importlib.import_module("comfy_extras.nodes_flux")
-except Exception as exc:  # pragma: no cover - runtime-only import
-    nodes_flux = None
-    _FLUX_ERR = exc
-else:  # pragma: no cover - runtime-only import
-    _FLUX_ERR = None
+    import comfy.utils as comfy_utils
+except Exception as exc:  # pragma: no cover - optional runtime dependency
+    comfy_utils = None
+    _COMFY_UTILS_ERR = exc
+else:  # pragma: no cover - exercised in ComfyUI runtime/tests when comfy exists
+    _COMFY_UTILS_ERR = None
 
 
 RESIZE_MODE_CHOICES = ["longest_edge", "keep_original"]
 MASK_MODE_CHOICES = ["none", "use_mask", "invert_mask"]
 CUSTOM_OUTPUT_TYPE = "LLS_FLUX2KLEIN_OUTPUT"
-DEFAULT_REFERENCE_LATENTS_METHOD = "index_timestep_zero"
+_VISION_TOTAL_PIXELS = int(384 * 384)
+_VISION_TOKEN = "<|vision_start|><|image_pad|><|vision_end|>"
 
 
 class _ConstantMask:
@@ -74,19 +71,10 @@ class _ConstantMask:
         )
 
 
-def _unwrap_first(result):
-    if hasattr(result, "result"):
-        values = result.result
-        if isinstance(values, tuple):
-            return values[0]
-        if isinstance(values, list):
-            return values[0]
-        return values
-    if isinstance(result, tuple):
-        return result[0]
-    if isinstance(result, list):
-        return result[0]
-    return result
+def _extract_latent_samples(latent):
+    if isinstance(latent, dict) and "samples" in latent:
+        return latent["samples"]
+    return latent
 
 
 def _get_image_batch_size(image) -> int:
@@ -169,138 +157,173 @@ def _prepare_mask(mask, image1, mask_mode: str):
     return _broadcast_mask_batch_if_needed(processed, image1)
 
 
-def _has_native_qwen_flux_runtime() -> bool:
-    return (
-        nodes_qwen is not None
-        and getattr(nodes_qwen, "TextEncodeQwenImageEditPlus", None) is not None
-    )
+def _resize_image_with_mode(image, width: int, height: int, *, upscale_method: str, crop: str):
+    if image is None:
+        return None
+
+    current_width, current_height = get_image_size(image)
+    if (current_width, current_height) == (int(width), int(height)):
+        return image
+
+    if torch is not None and isinstance(image, torch.Tensor):
+        if comfy_utils is None:
+            raise RuntimeError(
+                "[LLS] comfy.utils is required for Flux2Klein vision/image resizing in tensor mode."
+            ) from _COMFY_UTILS_ERR
+        channel_first = image.movedim(-1, 1)
+        resized = comfy_utils.common_upscale(channel_first, int(width), int(height), upscale_method, crop)
+        return resized.movedim(1, -1)
+
+    return resize_image_to(image, int(width), int(height))
 
 
-def _encode_with_native_qwen_flux(clip, vae, prompt: str, image1, image2=None, image3=None):
-    encoder_cls = getattr(nodes_qwen, "TextEncodeQwenImageEditPlus", None)
-    if encoder_cls is None:
-        raise RuntimeError("[LLS] Native Qwen edit encoder is unavailable.") from _QWEN_ERR
-
-    if hasattr(encoder_cls, "execute"):
-        conditioning = _unwrap_first(
-            encoder_cls.execute(
-                clip,
-                prompt,
-                vae=vae,
-                image1=image1,
-                image2=image2,
-                image3=image3,
-            )
-        )
-    else:
-        encoder = encoder_cls()
-        conditioning = _unwrap_first(
-            encoder.execute(
-                clip,
-                prompt,
-                vae=vae,
-                image1=image1,
-                image2=image2,
-                image3=image3,
-            )
-        )
-
-    # When reference images are present, append the standard Flux Kontext method tag
-    # so downstream KSampler paths can preserve multi-reference intent.
-    if (image2 is not None or image3 is not None) and nodes_flux is not None:
-        method_cls = getattr(nodes_flux, "FluxKontextMultiReferenceLatentMethod", None)
-        if method_cls is not None:
-            if hasattr(method_cls, "execute"):
-                conditioning = _unwrap_first(
-                    method_cls.execute(conditioning, DEFAULT_REFERENCE_LATENTS_METHOD)
-                )
-            else:
-                method_node = method_cls()
-                conditioning = _unwrap_first(
-                    method_node.execute(conditioning, DEFAULT_REFERENCE_LATENTS_METHOD)
-                )
-
-    return conditioning
+def _scale_image_to_total_pixels(image, total_pixels: int, *, upscale_method: str = "area"):
+    width, height = get_image_size(image)
+    current_total = max(1, int(width) * int(height))
+    scale_by = math.sqrt(float(total_pixels) / float(current_total))
+    target_width = max(1, int(round(width * scale_by)))
+    target_height = max(1, int(round(height * scale_by)))
+    return _resize_image_with_mode(image, target_width, target_height, upscale_method=upscale_method, crop="center")
 
 
-def _encode_with_lls_fallback(clip, prompt: str):
-    try:
-        conditioning, _negative, _prompt_info = LLSUniversalPromptEncode().encode(
-            text_encoder=clip,
-            positive_prompt=prompt,
-            negative_prompt="",
-            clip_skip=-1,
-            model_info=None,
-        )
+def _count_present_reference_images(image1, image2=None, image3=None) -> int:
+    return int(image1 is not None) + int(image2 is not None) + int(image3 is not None)
+
+
+def _build_flux2klein_prompt(prompt: str, image_count: int) -> str:
+    prefix = " ".join(f"image{i}: {_VISION_TOKEN}" for i in range(1, max(0, int(image_count)) + 1))
+    prompt_text = str(prompt or "")
+    if prefix and prompt_text:
+        return f"{prefix} {prompt_text}"
+    if prefix:
+        return prefix
+    return prompt_text
+
+
+def _append_reference_latents(conditioning, ref_latents):
+    if not ref_latents:
         return conditioning
-    except Exception:
-        tokenize = getattr(clip, "tokenize", None)
-        if not callable(tokenize):
-            raise RuntimeError(
-                "[LLS] No usable text encoding backend for LLS Flux2Klein Edit Text Encode. "
-                "Current clip object does not expose tokenize()/encode methods."
-            )
 
-        tokens = tokenize(prompt)
-        scheduled = getattr(clip, "encode_from_tokens_scheduled", None)
-        if callable(scheduled):
-            try:
-                return scheduled(tokens)
-            except Exception as exc:
-                raise RuntimeError(
-                    "[LLS] No usable text encoding backend for LLS Flux2Klein Edit Text Encode. "
-                    f"Scheduled CLIP encoding failed: {exc}"
-                ) from exc
-
-        plain_encode = getattr(clip, "encode_from_tokens", None)
-        if not callable(plain_encode):
-            raise RuntimeError(
-                "[LLS] No usable text encoding backend for LLS Flux2Klein Edit Text Encode. "
-                "Connect a compatible CLIP/Qwen encoder or run inside a ComfyUI build with the official edit encoders."
-            )
-
+    if node_helpers is not None:
         try:
-            encoded = plain_encode(tokens, return_pooled=True, return_dict=True)
-        except TypeError:
-            encoded = plain_encode(tokens, return_pooled=True)
+            return node_helpers.conditioning_set_values(conditioning, {"reference_latents": ref_latents}, append=True)
+        except Exception:
+            pass
+
+    updated = []
+    for entry in conditioning:
+        if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+            cond = entry[0]
+            meta = dict(entry[1])
+        else:
+            cond = entry
+            meta = {}
+        current_refs = list(meta.get("reference_latents", []))
+        current_refs.extend(ref_latents)
+        meta["reference_latents"] = current_refs
+        updated.append([cond, meta])
+    return updated
+
+
+def _encode_tokens_to_conditioning(clip, tokens):
+    scheduled = getattr(clip, "encode_from_tokens_scheduled", None)
+    if callable(scheduled):
+        try:
+            return scheduled(tokens)
         except Exception as exc:
             raise RuntimeError(
-                "[LLS] No usable text encoding backend for LLS Flux2Klein Edit Text Encode. "
-                f"Plain CLIP encoding failed: {exc}"
+                "[LLS] Flux2Klein vision token encoding failed while calling encode_from_tokens_scheduled(). "
+                f"Flux2Klein 视觉 token 编码失败: {exc}"
             ) from exc
 
-        if isinstance(encoded, dict) and "cond" in encoded:
-            meta = dict(encoded)
-            cond = meta.pop("cond")
-            return [[cond, meta]]
-        if isinstance(encoded, tuple) and len(encoded) >= 2:
-            cond, pooled = encoded[:2]
-            return [[cond, {"pooled_output": pooled}]]
-        return [[encoded, {}]]
-
-
-def _encode_conditioning(clip, vae, prompt: str, image1, image2=None, image3=None):
-    native_error = None
-    if _has_native_qwen_flux_runtime():
-        try:
-            return _encode_with_native_qwen_flux(
-                clip,
-                vae,
-                prompt,
-                image1=image1,
-                image2=image2,
-                image3=image3,
-            ), "native_qwen_flux", None
-        except Exception as exc:
-            native_error = str(exc)
+    plain_encode = getattr(clip, "encode_from_tokens", None)
+    if not callable(plain_encode):
+        raise RuntimeError(
+            "[LLS] No usable vision-aware text encoding backend for LLS Flux2Klein Edit Text Encode. "
+            "Current clip object does not expose encode_from_tokens_scheduled()/encode_from_tokens()."
+        )
 
     try:
-        return _encode_with_lls_fallback(clip, prompt), "lls_fallback", native_error
+        encoded = plain_encode(tokens, return_pooled=True, return_dict=True)
+    except TypeError:
+        encoded = plain_encode(tokens, return_pooled=True)
     except Exception as exc:
-        message = str(exc)
-        if native_error:
-            message = f"{message} Native encoder fallback reason: {native_error}"
-        raise RuntimeError(message) from exc
+        raise RuntimeError(
+            "[LLS] Flux2Klein vision token encoding failed while calling encode_from_tokens(). "
+            f"Flux2Klein 视觉 token 编码失败: {exc}"
+        ) from exc
+
+    if isinstance(encoded, dict) and "cond" in encoded:
+        meta = dict(encoded)
+        cond = meta.pop("cond")
+        return [[cond, meta]]
+    if isinstance(encoded, tuple) and len(encoded) >= 2:
+        cond, pooled = encoded[:2]
+        return [[cond, {"pooled_output": pooled}]]
+    return [[encoded, {}]]
+
+
+def _encode_multivision_conditioning(clip, prompt: str, images):
+    tokenize = getattr(clip, "tokenize", None)
+    if not callable(tokenize):
+        raise RuntimeError(
+            "[LLS] No usable vision-aware text encoding backend for LLS Flux2Klein Edit Text Encode. "
+            "Current clip object does not expose tokenize()."
+        )
+
+    full_prompt = _build_flux2klein_prompt(prompt, len(images))
+    try:
+        tokens = tokenize(full_prompt, images=images)
+    except TypeError as exc:
+        raise RuntimeError(
+            "[LLS] The connected clip does not support vision-aware tokenize(images=...). "
+            "请连接 Flux2 / Klein 兼容的多模态 clip。"
+        ) from exc
+    except Exception as exc:
+        raise RuntimeError(
+            "[LLS] Flux2Klein vision token preparation failed while calling tokenize(images=...). "
+            f"Flux2Klein 视觉 token 准备失败: {exc}"
+        ) from exc
+
+    return _encode_tokens_to_conditioning(clip, tokens), full_prompt
+
+
+def _encode_reference_latent(vae, image, target_width: int, target_height: int, source_name: str):
+    prepared = _resize_image_with_mode(
+        image,
+        target_width,
+        target_height,
+        upscale_method="lanczos",
+        crop="center",
+    )
+    try:
+        samples = vae.encode(prepared)
+    except Exception as exc:
+        raise RuntimeError(
+            f"[LLS] VAE encode failed for {source_name} / {source_name} 的 VAE 编码失败: {exc}"
+        ) from exc
+    return {"samples": samples}, prepared
+
+
+def _build_noise_mask(mask, latent_samples):
+    target_width = int(latent_samples.shape[-1])
+    target_height = int(latent_samples.shape[-2])
+    noise_mask = resize_mask_to(mask, target_width, target_height)
+    noise_mask = normalize_mask_values(noise_mask)
+    noise_mask = clamp_mask_values(noise_mask)
+    samples_batch = int(latent_samples.shape[0])
+
+    if torch is not None and isinstance(noise_mask, torch.Tensor):
+        mask_batch = int(noise_mask.shape[0])
+        if mask_batch == samples_batch:
+            return noise_mask
+        if mask_batch == 1 and samples_batch > 1:
+            return noise_mask.repeat(samples_batch, 1, 1)
+        raise RuntimeError(
+            f"[LLS] noise_mask batch size {mask_batch} does not match latent batch size {samples_batch}."
+        )
+
+    return noise_mask
 
 
 class LLSFlux2KleinEditTextEncode:
@@ -308,8 +331,9 @@ class LLSFlux2KleinEditTextEncode:
     FUNCTION = "encode"
     RETURN_TYPES = ("CONDITIONING", "LATENT", CUSTOM_OUTPUT_TYPE, "IMAGE", "MASK")
     RETURN_NAMES = ("conditioning", "latent", "custom_output", "main_image", "mask")
+    SEARCH_ALIASES = ["LLS", "Flux2Klein", "Edit Text Encode", "Flux Edit"]
     DESCRIPTION = (
-        "Flux2Klein-style edit text encode node for LLS. Uses image1 as the main edit image, "
+        "PainterFluxImageEdit-style Flux2Klein edit wrapper for LLS. Uses image1 as the main edit image, "
         "image2/image3 as reference images, never concatenates them, and prepares conditioning/latent/mask outputs."
     )
 
@@ -357,22 +381,33 @@ class LLSFlux2KleinEditTextEncode:
         reference_image_3 = _prepare_image(image3, str(resize_mode), int(ref_longest_edge))
         output_mask = _prepare_mask(mask, main_image, str(mask_mode))
 
-        conditioning, conditioning_backend, native_error = _encode_conditioning(
-            clip,
-            vae,
-            str(prompt),
-            main_image,
-            image2=reference_image_2,
-            image3=reference_image_3,
+        images_for_edit = [img for img in (main_image, reference_image_2, reference_image_3) if img is not None]
+        vision_images = [_scale_image_to_total_pixels(img, _VISION_TOTAL_PIXELS, upscale_method="area") for img in images_for_edit]
+        conditioning, full_prompt = _encode_multivision_conditioning(clip, str(prompt), vision_images)
+
+        target_width, target_height = get_image_size(main_image)
+        ref_latents = []
+        for index, image in enumerate(images_for_edit, start=1):
+            ref_latent, _prepared = _encode_reference_latent(
+                vae,
+                image,
+                target_width,
+                target_height,
+                source_name=f"image{index}",
+            )
+            ref_latents.append(ref_latent)
+
+        conditioning = _append_reference_latents(
+            conditioning,
+            [_extract_latent_samples(latent) for latent in ref_latents],
         )
 
-        # latent only encodes image1, because image2/image3 are reference images rather than target latents.
-        try:
-            latent_tensor = vae.encode(main_image)
-        except Exception as exc:
-            raise RuntimeError(
-                f"[LLS] VAE encode failed for image1 / 主编辑图编码失败: {exc}"
-            ) from exc
+        latent = {
+            "samples": _extract_latent_samples(ref_latents[0]),
+        }
+
+        if mask is not None and str(mask_mode) != "none":
+            latent["noise_mask"] = _build_noise_mask(output_mask, latent["samples"])
 
         reference_names = []
         if reference_image_2 is not None:
@@ -383,6 +418,7 @@ class LLSFlux2KleinEditTextEncode:
         custom_output = {
             "node_name": "LLS Flux2Klein Edit Text Encode",
             "prompt": str(prompt),
+            "full_prompt": full_prompt,
             "ref_longest_edge": int(ref_longest_edge),
             "resize_mode": str(resize_mode),
             "mask_mode": str(mask_mode),
@@ -390,14 +426,20 @@ class LLSFlux2KleinEditTextEncode:
             "main_image": "image1",
             "reference_images": reference_names,
             "num_reference_images": len(reference_names),
-            "conditioning_backend": conditioning_backend,
-            "native_error": native_error,
+            "conditioning_backend": "flux2klein_multivision_clip",
+            "native_error": None,
+            "native_wrapper": "PainterFluxImageEdit-compatible",
+            "latent_mode": "image1_reference_latent",
+            "latent_has_noise_mask": "noise_mask" in latent,
+            "vision_image_count": len(vision_images),
+            "reference_latent_count": len(ref_latents),
+            "target_size": {"width": int(target_width), "height": int(target_height)},
             "note": "image1 is main edit image; image2 and image3 are reference images; images are not concatenated",
         }
 
         return (
             conditioning,
-            {"samples": latent_tensor},
+            latent,
             custom_output,
             main_image,
             output_mask,
