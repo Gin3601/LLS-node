@@ -16,9 +16,16 @@ TARGET_CHOICES = ["A", "B"]
 POSITION_CHOICES = ["top", "bottom", "left", "right"]
 RESIZE_MODE_CHOICES = ["keep_proportion", "stretch", "none"]
 ALIGN_CHOICES = ["start", "center", "end"]
-INPUT_DATA_CHOICES = "IMAGE,MASK"
 PORT_A_NAME = "image/mask_A"
 PORT_B_NAME = "image/mask_B"
+
+
+class AnyType(str):
+    def __ne__(self, other):  # pragma: no cover - exercised by ComfyUI type checks
+        return False
+
+
+ANY_TYPE = AnyType("*")
 
 
 def _require_torch():
@@ -452,8 +459,8 @@ class LLSConcatByTarget:
                 "allow_batch_broadcast": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                PORT_A_NAME: (INPUT_DATA_CHOICES,),
-                PORT_B_NAME: (INPUT_DATA_CHOICES,),
+                "a": (ANY_TYPE,),
+                "b": (ANY_TYPE,),
             },
         }
 

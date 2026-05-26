@@ -31,7 +31,7 @@ class TestConcatByTargetNode(unittest.TestCase):
         self.assertLessEqual(float(image.max().item()), 1.0)
         self.assertTrue(torch.allclose(mask, torch.zeros_like(mask)))
 
-    def test_new_port_names_are_accepted(self):
+    def test_legacy_port_names_are_accepted(self):
         image_a = self.make_image(width=2, height=2, value=0.2)
         image_b = self.make_image(width=1, height=2, value=0.8)
 
